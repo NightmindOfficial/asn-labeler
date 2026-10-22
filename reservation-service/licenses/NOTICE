@@ -1,0 +1,14 @@
+ASN Labeler
+Copyright (c) 2026 nightmind.dev
+https://nightmind.dev
+
+Original project code is licensed under GNU AGPL version 3 only (AGPL-3.0-only).
+The full license is in LICENSE. No "or any later version" grant is made.
+The Windows client additionally carries the permission in
+LICENSE-BPAC-EXCEPTION.txt. That permission does not apply to the service.
+
+Third-party components remain under their original licenses; see
+THIRD-PARTY-NOTICES.md. This notice does not relicense third-party materials.
+
+The software is provided without warranty to the extent permitted by law;
+see sections 15 and 16 of LICENSE.

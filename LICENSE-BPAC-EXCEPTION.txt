@@ -1,0 +1,23 @@
+ASN Labeler - Additional permission under GNU AGPL version 3 section 7
+
+This permission applies only to the original ASN Labeler Windows client code
+provided by nightmind.dev, and to modifications whose copyright holders choose
+to retain this permission. It does not apply to the reservation service or to
+third-party code merely included with this project.
+
+If you modify this Program, or any covered work, by linking or combining it
+with the proprietary Brother P-touch Applicable Component (b-PAC) runtime and
+Brother printer drivers through their published interfaces, the copyright
+holders of this Program grant you additional permission to convey the resulting
+work. The Corresponding Source for the covered work need not include the source
+code of those proprietary Brother components.
+
+All other requirements of the GNU Affero General Public License version 3
+continue to apply to the covered work. This permission grants no rights to
+Brother software, trademarks, or documentation; you must obtain and comply with
+the applicable Brother licenses independently. Brother components are not
+included in ASN Labeler releases and are installed separately from Brother.
+
+You may remove this additional permission from your version. If you retain it,
+include this text with your version. This permission does not authorize adding
+an exception to code owned by others without their permission.
