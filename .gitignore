@@ -1,0 +1,36 @@
+# Local configuration and credentials
+.local/
+.env
+.env.*
+!.env.example
+*.pfx
+*.p12
+*.pem
+*.key
+
+# Runtime state and diagnostics
+*.sqlite*
+*.db
+*.db-*
+*.log
+Diagnostics/
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+
+# Build outputs and release downloads
+artifacts/
+windows-app/dist*/
+**/bin/
+**/obj/
+*.zip
+*.7z
+*.nupkg
+*.download
+
+# Editor and machine state
+.vs/
+.idea/
+.DS_Store
+Thumbs.db

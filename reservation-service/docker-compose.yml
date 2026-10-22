@@ -1,0 +1,35 @@
+services:
+  asn-reservation:
+    build: .
+    image: asn-reservation:local
+    pull_policy: build
+    container_name: asn-reservation
+    restart: unless-stopped
+    env_file:
+      - .env
+    ports:
+      - "${NAS_BIND_IP:-127.0.0.1}:8765:8765"
+    volumes:
+      - asn-reservation-data:/data
+    read_only: true
+    tmpfs:
+      - /tmp:size=16m,mode=1777
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    pids_limit: 128
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import json,urllib.request; assert json.load(urllib.request.urlopen('http://127.0.0.1:8765/health',timeout=3))['ok']"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+volumes:
+  asn-reservation-data:
