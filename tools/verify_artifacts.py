@@ -27,11 +27,18 @@ def validate_archive(archive, required):
         raise ValueError("Archive CRC validation failed")
 
 
-def verify(directory, version, commit):
+def verify(directory, version, commit, component="client"):
     directory = Path(directory)
-    names = verify_manifest(directory, version, commit)
-    if (directory / "asn-labeler.exe").read_bytes()[:2] != b"MZ":
-        raise ValueError("Client is not a Windows executable")
+    names = verify_manifest(directory, version, commit, component)
+    if component == "server":
+        verify_server(directory, version)
+    else:
+        verify_client(directory, version)
+    print("Verified release artifacts for", component, version, commit)
+    return names
+
+
+def verify_server(directory, version):
     with ZipFile(directory / f"asn-reservation-{version}-nas.zip") as archive:
         validate_archive(archive, ["VERSION", "Dockerfile", "app.py", "README.md", "source.zip", "licenses/LICENSE"])
         if archive.read("VERSION").decode().strip() != version:
@@ -41,16 +48,19 @@ def verify(directory, version, commit):
             for name in source.namelist():
                 if source.read(name) != archive.read(name):
                     raise ValueError("Service source download differs from deployment: " + name)
+
+
+def verify_client(directory, version):
+    if (directory / "asn-labeler.exe").read_bytes()[:2] != b"MZ":
+        raise ValueError("Client is not a Windows executable")
     with ZipFile(directory / f"asn-labeler-{version}-source.zip") as archive:
         validate_archive(archive, ["LICENSE", "LICENSE-BPAC-EXCEPTION.txt", "package-release.py",
                                   ".github/workflows/ci.yml", "tools/release_common.py",
-                                  "reservation-service/VERSION", "windows-app/build.ps1",
+                                  "windows-app/VERSION", "windows-app/build.ps1",
                                   "windows-app/vendor/ZXing.Net/source-v0.16.11.0.zip"])
-        if archive.read("reservation-service/VERSION").decode().strip() != version:
+        if archive.read("windows-app/VERSION").decode().strip() != version:
             raise ValueError("Source package version mismatch")
-    print("Verified release artifacts for", version, commit)
-    return names
 
 
 if __name__ == "__main__":
-    verify(Path(sys.argv[1]), read_version(ROOT), os.environ.get("GITHUB_SHA"))
+    verify(Path(sys.argv[2]), read_version(ROOT, sys.argv[1]), os.environ.get("GITHUB_SHA"), sys.argv[1])

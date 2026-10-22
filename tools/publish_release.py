@@ -7,7 +7,7 @@ import sys
 from urllib.error import HTTPError
 from urllib.parse import quote, urlsplit
 from urllib.request import Request, urlopen
-from release_common import digest, read_version, release_notes
+from release_common import COMPONENTS, digest, read_version, release_notes
 from verify_artifacts import verify
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -69,8 +69,8 @@ def find_release(api, tag):
     raise ValueError("Release lookup limit reached; no release was modified")
 
 
-def publish(api, directory, version, commit, notes, names):
-    tag = "v" + version
+def publish(api, directory, version, commit, notes, names, component="client"):
+    tag = component + "-v" + version
     existing = find_release(api, tag)
     if existing and not existing["draft"]:
         print(tag, "is already published; leaving it unchanged.")
@@ -86,7 +86,7 @@ def publish(api, directory, version, commit, notes, names):
     if existing and existing["target_commitish"] != commit:
         raise ValueError("Existing draft belongs to another commit; inspect it before retrying")
     release = existing or api.request("POST", "/releases", {
-        "tag_name": tag, "target_commitish": commit, "name": "ASN Labeler " + version,
+        "tag_name": tag, "target_commitish": commit, "name": "ASN Labeler " + component.title() + " " + version,
         "body": notes, "draft": True, "prerelease": False,
     })
     endpoint = "/releases/" + str(release["id"])
@@ -110,7 +110,7 @@ def publish(api, directory, version, commit, notes, names):
     # Check again after large uploads; do not publish if main changed in the meantime.
     if api.request("GET", "/git/ref/heads/main")["object"]["sha"] != commit:
         raise ValueError("main advanced during upload; draft remains unpublished")
-    api.request("PATCH", endpoint, {"body": notes, "draft": False, "make_latest": "true"})
+    api.request("PATCH", endpoint, {"body": notes, "draft": False, "make_latest": "false"})
     print("Published", tag)
     return "published"
 
@@ -121,12 +121,12 @@ def main():
     commit = os.environ.get("GITHUB_SHA", "")
     if not re.fullmatch(r"[0-9a-f]{40}", commit):
         raise ValueError("Invalid release commit")
-    directory = Path(sys.argv[1])
-    version = read_version(ROOT)
-    names = verify(directory, version, commit)
-    notes = release_notes((ROOT / "CHANGELOG.md").read_text(encoding="utf-8"), version)
+    component, directory = sys.argv[1], Path(sys.argv[2])
+    version = read_version(ROOT, component)
+    names = verify(directory, version, commit, component)
+    notes = release_notes((ROOT / COMPONENTS[component] / "CHANGELOG.md").read_text(encoding="utf-8"), version)
     api = GitHub(os.environ["GITHUB_REPOSITORY"], os.environ["GITHUB_TOKEN"])
-    publish(api, directory, version, commit, notes, names)
+    publish(api, directory, version, commit, notes, names, component)
 
 
 if __name__ == "__main__":

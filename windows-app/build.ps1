@@ -18,7 +18,7 @@ if (!(Test-Path $csc)) {
 }
 
 New-Item -ItemType Directory -Force -Path $dist | Out-Null
-$version = (Get-Content -LiteralPath (Join-Path $project 'reservation-service/VERSION') -Raw).Trim()
+$version = (Get-Content -LiteralPath (Join-Path $project 'windows-app/VERSION') -Raw).Trim()
 if ($version -notmatch '^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$' -or
     @($version.Split('.') | Where-Object { [long]$_ -gt 65534 }).Count -ne 0) {
     throw 'VERSION must be X.Y.Z with each component between 0 and 65534.'

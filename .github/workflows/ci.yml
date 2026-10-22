@@ -17,6 +17,11 @@ concurrency:
 jobs:
   metadata:
     name: Release metadata
+    outputs:
+      client_version: ${{ steps.versions.outputs.client_version }}
+      server_version: ${{ steps.versions.outputs.server_version }}
+      client_release: ${{ steps.versions.outputs.client_release }}
+      server_release: ${{ steps.versions.outputs.server_release }}
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
@@ -28,6 +33,7 @@ jobs:
         with:
           python-version: '3.12'
       - name: Validate version and changelog
+        id: versions
         env:
           CI_BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before || '' }}
         run: python tools/check_release.py
@@ -36,6 +42,7 @@ jobs:
 
   server:
     name: Service tests
+    needs: metadata
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
@@ -50,9 +57,26 @@ jobs:
       - run: python reservation-service/package_source.py --output reservation-service/source.zip
       - run: python -m unittest discover -s reservation-service/tests
       - run: python -m unittest discover -s windows-app/tests -p test_release_packaging.py
+      - name: Package server release
+        if: needs.metadata.outputs.server_release == 'true'
+        run: python package-release.py server
+      - name: Verify server package
+        if: needs.metadata.outputs.server_release == 'true'
+        env:
+          PACKAGE_VERSION: ${{ needs.metadata.outputs.server_version }}
+        run: python tools/verify_artifacts.py server "artifacts/server/$PACKAGE_VERSION"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main' && needs.metadata.outputs.server_release == 'true'
+        with:
+          name: release-server
+          path: artifacts/server/${{ needs.metadata.outputs.server_version }}/
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 7
 
   windows:
     name: Windows build and tests
+    needs: metadata
     runs-on: windows-2022
     timeout-minutes: 30
     defaults:
@@ -67,26 +91,26 @@ jobs:
           python-version: '3.12'
       - name: Build Windows client
         run: ./windows-app/build.ps1
-      - name: Read package version
-        id: version
-        run: python tools/check_release.py
       - name: Client self-tests (including simulated printer and layouts)
         run: |
           ./windows-app/dist/asn-labeler-test.exe --self-test
           if ($LASTEXITCODE -ne 0) { throw 'Client self-tests failed' }
       - name: Fetch verified third-party source
+        if: needs.metadata.outputs.client_release == 'true'
         run: ./windows-app/tools/fetch-zxing-source.ps1
       - name: Package release and source
-        run: python package-release.py
+        if: needs.metadata.outputs.client_release == 'true'
+        run: python package-release.py client
       - name: Verify archive contents and manifest
+        if: needs.metadata.outputs.client_release == 'true'
         env:
-          PACKAGE_VERSION: ${{ steps.version.outputs.version }}
-        run: python tools/verify_artifacts.py "artifacts/$env:PACKAGE_VERSION"
+          PACKAGE_VERSION: ${{ needs.metadata.outputs.client_version }}
+        run: python tools/verify_artifacts.py client "artifacts/client/$env:PACKAGE_VERSION"
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
-        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main' && needs.metadata.outputs.client_release == 'true'
         with:
-          name: release-files
-          path: artifacts/${{ steps.version.outputs.version }}/
+          name: release-client
+          path: artifacts/client/${{ needs.metadata.outputs.client_version }}/
           if-no-files-found: error
           compression-level: 0
           retention-days: 7
@@ -121,7 +145,7 @@ jobs:
   release:
     name: Publish release
     if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
-    needs: gate
+    needs: [gate, metadata]
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     permissions:
@@ -134,12 +158,22 @@ jobs:
         with:
           python-version: '3.12'
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        if: needs.metadata.outputs.client_release == 'true'
         with:
-          name: release-files
-          path: artifacts/
-      - name: Verify tested artifacts
-        run: python tools/verify_artifacts.py artifacts
-      - name: Publish new version (existing published releases remain untouched)
+          name: release-client
+          path: artifacts/client/
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        if: needs.metadata.outputs.server_release == 'true'
+        with:
+          name: release-server
+          path: artifacts/server/
+      - name: Publish client (existing published releases remain untouched)
+        if: needs.metadata.outputs.client_release == 'true'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: python tools/publish_release.py artifacts
+        run: python tools/publish_release.py client artifacts/client
+      - name: Publish server (existing published releases remain untouched)
+        if: needs.metadata.outputs.server_release == 'true'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: python tools/publish_release.py server artifacts/server

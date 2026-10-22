@@ -1,126 +1,116 @@
 # Updates und Releases
 
-## Voraussetzungen
+## Unabhaengige Versionen
 
-Client und Service werden aus einem gemeinsam geprueften Quellcodestand gebaut.
-`.github/workflows/ci.yml` prueft Pull Requests vor dem Merge und `main` nach dem
-Merge. Eine noch nicht veroeffentlichte Version wird anschliessend automatisch
-als GitHub Release bereitgestellt. Bestehende Installationen aktualisieren sich
-dadurch nicht selbst. Ein Docker-Image wird noch nicht auf GHCR veroeffentlicht.
+- Client: `windows-app/VERSION` und `windows-app/CHANGELOG.md`.
+- Server inklusive Adminpanel: `reservation-service/VERSION` und `reservation-service/CHANGELOG.md`.
+- Format: `X.Y.Z`, ohne fuehrende Nullen; jeder Teil maximal 65534.
+- Patch: Fehlerkorrektur. Minor: kompatible Erweiterung. Major: inkompatible
+  Aenderung am zugesicherten Vertrag der jeweiligen Komponente.
+- Keine Gesamtversion. Das root-CHANGELOG bleibt als historische Zusammenfassung.
+
+Ein Branch und ein Pull Request koennen eine oder beide Komponenten aendern.
+Nur betroffene Komponenten erhalten hoehere Versionen und Release Notes unter
+genau einer nicht leeren Ueberschrift `## X.Y.Z`.
 
 ## Einmalige GitHub-Einrichtung
 
-1. Projekt und Workflow auf einem Entwicklungsbranch pushen, Pull Request gegen
-   `main` erstellen. Die Checks einmal vollstaendig laufen lassen. Beim ersten
-   Import entstehen keine weiteren Voraussetzungen durch fehlende alte Tags.
-2. Unter Settings > Actions > General GitHub Actions erlauben. Die verwendeten
-   offiziellen Actions muessen erlaubt sein. Der Workflow setzt Leserechte als
-   Standard und benoetigt nur im Publish-Job `contents: write`. Keine persoenlichen
-   Tokens oder Brother-Komponenten als Secrets hinterlegen. Eine uebergeordnete
-   Organisationsrichtlinie darf diese Schreibberechtigung nicht verbieten.
-3. Unter Settings > Rules > Rulesets einen aktiven Branch-Ruleset fuer `main`
-   einrichten: Pull Request erforderlich, Statuscheck **CI gate** erforderlich,
-   Branch muss vor dem Merge aktuell sein, Force-Pushes und Loeschen blockieren.
-   Als Check-Quelle GitHub Actions waehlen. Keine Bypass-Ausnahme fuer den normalen
-   Arbeitsablauf; bei Einzelentwicklung keine zweite Genehmigung verlangen.
-4. Der Check erscheint nach seinem ersten Lauf in der Auswahl. Ohne aktiven
-   Ruleset laufen Tests zwar, verhindern aber nicht technisch einen Merge.
-5. Ersten gruenen Pull Request mergen. Ist `v1.4.3` noch nicht veroeffentlicht,
-   erstellt dieser erste Import nach den `main`-Tests automatisch Release 1.4.3.
-   Die Workflows muessen danach im Actions-Tab als erfolgreich bestaetigt werden.
+1. Entwicklungsbranch pushen und PR gegen `main` oeffnen. Checks laufen lassen.
+2. Settings > Actions > General: GitHub Actions und die verwendeten offiziellen
+   Actions erlauben. Nur Publish benoetigt `contents: write`. Keine persoenlichen
+   Tokens oder Brother-Komponenten als Secrets erforderlich.
+3. Settings > Rules > Rulesets: aktiven Branch-Ruleset fuer `main` anlegen.
+   Pull Request und Statuscheck **CI gate** verlangen, Branch-Aktualitaet vor dem
+   Merge verlangen, Force-Pushes und Loeschen blockieren. Quelle: GitHub Actions.
+   Keine regulaere Bypass-Ausnahme; allein keine zweite Genehmigung verlangen.
+4. Der Check ist nach dem ersten Lauf auswaehlbar. Ohne Ruleset verhindern Tests
+   keinen Merge technisch. GitHub-Runner und Docker-Start erstmals pruefen.
+5. Ersten gruenen PR mergen. Der Import veroeffentlicht `client-v1.4.3` und
+   `server-v1.4.3`, sofern noch nicht vorhanden. Alte Tags wie `v1.4.3` bleiben
+   unangetastet und gehoeren nicht zu den neuen getrennten Release-Reihen.
 
-Die Repository-Regeln werden nicht durch die YAML-Datei selbst aktiviert.
+## Normaler Ablauf
 
-## Aenderungen entwickeln
+1. `main` aktualisieren, Entwicklungsbranch anlegen, implementieren und lokal testen.
+2. VERSION und CHANGELOG nur der geaenderten Komponenten aktualisieren.
+3. Committen, pushen und einen PR erstellen. Keine Laufzeitdaten committen.
+4. GitHub prueft Metadaten, Service-Tests, Windows-Build/Selbsttests, Paketgrenzen
+   und Docker-Start. Beide Komponenten werden weiterhin getestet und gebaut.
+5. Nach gruenen Checks und erforderlichen Hardwaretests mergen.
+6. Auf `main` wiederholt GitHub die Pruefungen. Nur Komponenten mit ausstehender
+   Veroeffentlichung erhalten Release-Pakete und einen eigenen GitHub Release.
 
-1. Aktuellen Stand holen (z. B. Fetch/Pull in GitHub Desktop).
-2. Fuer die Aenderung einen Branch erstellen. Code und zugehoerige Tests anpassen.
-3. Client-Selbsttest, Service-Tests und Release-Tests aus der README ausfuehren.
-   Bei Druckaenderungen zusaetzlich echte Hardware testen; Simulation ersetzt das nicht.
-4. Aenderungen in GitHub Desktop pruefen, committen und pushen; per Pull Request
-   nach `main` uebernehmen. Keine `.env`, Logs oder Datenbanken committen.
+Nur Client geaendert: `client-v1.5.0`. Nur Server geaendert: `server-v1.4.4`.
+Beide geaendert: zwei Releases aus einem Commit, ohne zweiten PR oder manuelle Tags.
 
-## Eine Version veroeffentlichen
+Die Checks blockieren Versionsrueckschritte, Wiederverwendung bereits getaggter
+neuer Versionen und Aenderungen innerhalb einer Komponente ohne Bump. Tests und
+Markdown sind ausgenommen. Gemeinsame Lizenzdateien betreffen beide Komponenten.
+Reine CI-/Release-Werkzeug- oder Dokumentationsaenderungen duerfen ohne Release
+gemergt werden. Bei gemeinsamem Build-/Paketcode entscheidet das Review, ob neue
+Auslieferungen und damit Versionsanhebungen erforderlich sind.
 
-1. In `reservation-service/VERSION` eine neue Version als `X.Y.Z` eintragen,
-   beispielsweise `1.4.4`. Nur diese Datei bestimmt die Client-/Server-/Paketversion.
-   Keine fuehrenden Nullen oder Vorabversionssuffixe; jeder Teil maximal 65534.
-2. In `CHANGELOG.md` genau einen Abschnitt `## X.Y.Z` mit den Release Notes
-   ergaenzen. Migrationen, Kompatibilitaet und Update-Reihenfolge dokumentieren.
-3. Branch pushen und Pull Request erstellen. GitHub prueft Metadaten, Service,
-   Windows-Build/Selbsttests, Paketgrenzen, Docker-Build und Containerstart.
-   **CI gate** wird nur gruen, wenn alle vier Jobs erfolgreich sind.
-4. Nach erfolgreichen Checks und gegebenenfalls Hardwaretests mergen. Auf `main`
-   laufen dieselben Pruefungen noch einmal. Danach werden Tag `vX.Y.Z`, Release
-   Notes und Downloads automatisch erstellt. Keine manuelle Tag-Erstellung noetig.
+## Gate und Veroeffentlichung
 
-Ein Merge ohne neue Versionsnummer fuehrt bei einer bereits veroeffentlichten
-Version zu keinem neuen Release. Alte Releases werden niemals ueberschrieben.
-Pull Requests erhalten keine Release-Schreibrechte und veroeffentlichen nichts.
+**CI gate** wird nur bei Erfolg aller vier Pruefjobs gruen. Der Ruleset erzwingt
+dies vor dem Merge. Fehler nach dem Merge verhindern die Veroeffentlichung,
+nicht rueckwirkend den Merge.
 
-## Pakete und lokale Vorschau
+Pro PR und fuer `main` existiert eine Concurrency-Gruppe. Laufende Runs werden
+nicht durch neue Pushes abgebrochen; GitHub kann wartende Zwischenstaende ersetzen.
+Der Publisher prueft vor und nach Upload, ob sein Commit noch `main` ist.
 
-Ein Release enthaelt die EXE, NAS- und vollstaendiges Quellcode-ZIP sowie
-`release-manifest.json` und `SHA256SUMS.txt`. Das Manifest bindet die Downloads
-an Version und geprueften Git-Commit. Die Windows-EXE ist weiterhin unsigniert;
-Pruefsummen ersetzen keine Codesignatur.
+Nur gepruefte Artifacts aus demselben Run werden veroeffentlicht. Manifest und
+SHA-256 binden sie an Komponente, Version und Commit. Uploads gehen zuerst in einen
+Entwurf; erst nach Pruefung wird veroeffentlicht. Fehler lassen den Entwurf offen.
+Beim gleichen Commit ersetzt eine Wiederholung nur bekannte Entwurfs-Assets.
+Veroeffentlichte Releases werden nie geaendert. Fremde Tags/Entwuerfe werden
+nicht automatisch umgeschrieben; bei Konflikt bewusst pruefen oder neue Version nutzen.
 
-Fuer einen lokalen Paketbuild nach dem normalen Windows-Build:
+Zwei Releases sind keine atomare Transaktion: Gelingt einer und der zweite nicht,
+Run wiederholen. Der bereits veroeffentlichte bleibt unberuehrt. Keine globale
+Latest-Markierung fuer beide Produkte verwenden. Kuenftige Updater muessen nach
+`client-v` bzw. `server-v` filtern und Entwuerfe/Vorabversionen ausschliessen.
 
-   ```powershell
-   powershell -NoProfile -ExecutionPolicy Bypass -File windows-app/tools/fetch-zxing-source.ps1
-   python package-release.py
-   ```
-
-Die festgelegte Pruefsumme wird kontrolliert. Das Archiv bleibt Git-ignoriert.
-Pakete liegen unter `artifacts/X.Y.Z/`; die EXE auch unter `windows-app/dist/`.
-Ohne GitHub Actions enthaelt das Manifest keinen bestaetigten CI-Commit und ist
-als lokaler Build zu behandeln. `python tools/verify_artifacts.py artifacts/X.Y.Z`
-prueft die lokalen Archive. Der Publisher laesst nur einen geprueften `main`-Lauf zu.
-
-## Fehler und Wiederholung
-
-- Fehlende/fehlerhafte Tests blockieren **CI gate**. Bei Fehlern nach dem Merge
-  gibt es keinen neuen Release; der Merge selbst ist dann bereits erfolgt.
-- Ein fehlgeschlagener Upload bleibt als Entwurf unsichtbar fuer normale
-  Downloadnutzer. Im Actions-Tab den Lauf wiederholen. Beim gleichen Commit
-  werden nur dessen Entwurfs-Uploads ersetzt, nie veroeffentlichte Assets.
-- Ein Tag oder Entwurf fuer einen anderen Commit wird nicht automatisch
-  umgeschrieben. Konflikt pruefen und vorzugsweise eine neue Version vergeben.
-  Einen fehlgeschlagenen eigenen Entwurf nur bewusst entfernen, nicht einen
-  bereits veroeffentlichten Release ersetzen.
-- Wenn `main` inzwischen weitergelaufen ist, veroeffentlicht ein alter Lauf nicht
-  nachtraeglich einen ueberholten Stand. In Actions kann **Run workflow** auf `main`
-  alle Pruefungen erneut ausloesen, sobald der Workflow auf `main` liegt.
-- Windows-Layouttests laufen ohne angeschlossenen Brother. Falls die Runner-
-  Umgebung abweicht, den Test untersuchen statt ihn stillschweigend zu ueberspringen.
-
-## Installationen aktualisieren (heute)
-
-- Client: App schliessen, neue EXE beziehen und bisherige ersetzen. Benutzer-
-  einstellungen bleiben im Benutzerprofil; trotzdem Release Notes beachten.
-- NAS: Datenbankbackup erstellen, laufende Druckauftraege beenden, neues NAS-Paket
-  ins bestehende Projekt entpacken. `.env`, Projektname und Datenvolume behalten.
-  In UGREEN das bestehende Projekt neu bauen und bereitstellen. Nicht nur den
-  alten Container neu starten. `/health`, Adminpanel und Client danach pruefen.
-- Ein gemeinsamer Release bedeutet nicht automatisch, dass alle aelteren Clients
-  kompatibel sind. API-Version/Capabilities und Release Notes sind massgeblich.
-
-## Inhalt der Pakete
-
-Oeffentliche Dokumentation wird ueber `PUBLIC_DOCUMENTS` in `package-release.py`
-festgelegt. Neue Dokumente muessen dort bewusst aufgenommen werden. Der Service
-verwendet eine eigene Dateiliste in `reservation-service/package_source.py`.
-Lokale Notizen, Zugangsdaten, Laufzeitdaten und Build-Verzeichnisse gehoeren nicht
-in Quellcodepakete. `.gitignore` ersetzt diese Paketpruefung nicht.
-
-Die Paketgrenzen koennen separat getestet werden:
+## Lokale Builds
 
 ```powershell
-python -m unittest discover -s windows-app/tests -p test_release_packaging.py
-python -m unittest discover -s tools/tests
+powershell -NoProfile -ExecutionPolicy Bypass -File windows-app/build.ps1
+powershell -NoProfile -ExecutionPolicy Bypass -File windows-app/tools/fetch-zxing-source.ps1
+python package-release.py client
+python tools/verify_artifacts.py client artifacts/client/1.4.3
+
+python package-release.py server
+python tools/verify_artifacts.py server artifacts/server/1.4.3
 ```
 
-Referenzen:
-- https://docs.github.com/en/repositories/releasing-projects-on-github/managing-releases-in-a-repository
-- https://docs.github.com/en/actions/tutorials/publish-packages/publish-docker-images
+Pfade an die jeweilige Version anpassen. Server-Pakete benoetigen weder EXE noch
+ZXing-Download. Client-Releases enthalten EXE und vollstaendiges Quellcode-ZIP;
+Server-Releases das NAS-ZIP inklusive Service-Quellcode. Beide enthalten
+`release-manifest.json` und `SHA256SUMS.txt`. Die EXE bleibt unsigniert.
+Lokale Manifeste ohne GitHub Actions enthalten keinen bestaetigten CI-Commit.
+
+```powershell
+python -m unittest discover -s tools/tests
+python -m unittest discover -s windows-app/tests -p test_release_packaging.py
+```
+
+## Kompatibilitaet und Updates
+
+Produktversionen sind keine API-Versionen. Server 2.x und Client 1.x koennen
+kompatibel sein. Massgeblich sind `apiVersion`, benoetigte `capabilities` und eine
+gegebenenfalls ausdruecklich gemeldete `minimumClientVersion` in `/health`.
+Aktuell unterstuetzt der Client API 1 und alte additive Health-Antworten ohne
+API-Feld; unbekannte APIs werden abgewiesen. Sekundaerlabels und sicherer Abgleich
+erfordern passende Faehigkeiten. Produkt-Major-Versionen werden nicht verglichen.
+Eine neue inkompatible API braucht eine bewusst implementierte Migration;
+eine neue Produkt-VERSION allein aendert das API-Protokoll nicht.
+
+Adminpanel und Service gehoeren zusammen: Veraltete Adminseiten muessen nach
+Server-Updates neu geladen werden. Das ist keine Client-Versionssperre.
+
+Installationen aktualisieren sich nicht automatisch. Client schliessen und EXE
+ersetzen. NAS: Backup, Druckauftraege beenden, NAS-Paket entpacken, `.env`,
+Projektname und Volume behalten; UGREEN-Projekt neu bauen und bereitstellen.
+Danach `/health`, Adminpanel und Client pruefen. Noch kein Docker-Image auf GHCR.
+Migrationen und Kompatibilitaet in Release Notes beachten; Hardwaretests bleiben lokal.

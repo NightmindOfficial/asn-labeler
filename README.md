@@ -1,7 +1,9 @@
 # ASN Labeler
 
 Windows-Client und selbst hostbarer Reservation-Service fuer ASN-Labels in
-paperless-ngx. Die gemeinsame Version steht in [VERSION](reservation-service/VERSION).
+paperless-ngx. [Clientversion](windows-app/VERSION) und
+[Serverversion](reservation-service/VERSION) werden unabhaengig gepflegt.
+Release Notes: [Client](windows-app/CHANGELOG.md), [Server](reservation-service/CHANGELOG.md).
 
 - DataMatrix-Labels fuer Brother QL-800 ueber den separat installierten b-PAC-Client.
 - Stanz- und Endlosmedien; eigenes Profil fuer PF-B11221-kompatible Rollen.

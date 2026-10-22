@@ -14,8 +14,11 @@ def version_tuple(value):
     return parts
 
 
-def read_version(root):
-    version = (Path(root) / "reservation-service/VERSION").read_text(encoding="utf-8").strip()
+COMPONENTS = {"client": "windows-app", "server": "reservation-service"}
+
+
+def read_version(root, component="server"):
+    version = (Path(root) / COMPONENTS[component] / "VERSION").read_text(encoding="utf-8").strip()
     version_tuple(version)
     return version
 
@@ -33,9 +36,13 @@ def release_notes(text, version):
     return notes
 
 
-def asset_names(version):
+def asset_names(version, component="client"):
     version_tuple(version)
-    return ["asn-labeler.exe", f"asn-labeler-{version}-source.zip", f"asn-reservation-{version}-nas.zip"]
+    if component == "client":
+        return ["asn-labeler.exe", f"asn-labeler-{version}-source.zip"]
+    if component == "server":
+        return [f"asn-reservation-{version}-nas.zip"]
+    raise ValueError("Unknown component")
 
 
 def digest(path):
@@ -43,24 +50,24 @@ def digest(path):
         return hashlib.file_digest(stream, "sha256").hexdigest()
 
 
-def write_manifest(directory, version, commit):
+def write_manifest(directory, version, commit, component="client"):
     directory = Path(directory)
     files = {name: {"sha256": digest(directory / name), "size": (directory / name).stat().st_size}
-             for name in asset_names(version)}
+             for name in asset_names(version, component)}
     manifest = directory / "release-manifest.json"
-    manifest.write_text(json.dumps({"version": version, "commit": commit, "files": files}, indent=2) + "\n", encoding="utf-8")
-    names = asset_names(version) + [manifest.name]
+    manifest.write_text(json.dumps({"component": component, "version": version, "commit": commit, "files": files}, indent=2) + "\n", encoding="utf-8")
+    names = asset_names(version, component) + [manifest.name]
     (directory / "SHA256SUMS.txt").write_text("".join(digest(directory / n) + "  " + n + "\n" for n in names), encoding="utf-8")
 
 
-def verify_manifest(directory, version, commit):
+def verify_manifest(directory, version, commit, component="client"):
     directory = Path(directory)
     manifest = json.loads((directory / "release-manifest.json").read_text(encoding="utf-8"))
-    if manifest.get("version") != version or manifest.get("commit") != commit:
+    if manifest.get("component") != component or manifest.get("version") != version or manifest.get("commit") != commit:
         raise ValueError("Artifacts do not belong to this version and commit")
-    if set(manifest.get("files", {})) != set(asset_names(version)):
+    if set(manifest.get("files", {})) != set(asset_names(version, component)):
         raise ValueError("Unexpected artifact manifest")
-    names = asset_names(version) + ["release-manifest.json", "SHA256SUMS.txt"]
+    names = asset_names(version, component) + ["release-manifest.json", "SHA256SUMS.txt"]
     if {p.name for p in directory.iterdir()} != set(names):
         raise ValueError("Release directory contains missing or unexpected files")
     for name, expected in manifest["files"].items():

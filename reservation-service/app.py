@@ -835,7 +835,7 @@ class ApiRequest:
                 self.route = path
             if path == "/health" and method == "GET":
                 return self.send_json({"ok": True, "version": VERSION, "time": now(),
-                    "apiVersion": 1, "recommendedClientVersion": VERSION,
+                    "apiVersion": 1,
                     "capabilities": ["safe-sync-v1", "physical-label-confirmation-v1", "secondary-label-tracking-v1"]})
             admin = path.startswith("/api/admin/") and path != "/api/admin/reset-to-paperless"
             if not self.authorized(admin):

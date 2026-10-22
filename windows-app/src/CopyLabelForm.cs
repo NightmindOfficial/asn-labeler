@@ -334,6 +334,9 @@ namespace AsnLabeler
             settings.ServerUrl = "https://other.test";
             if (!snapshot.ServerChanged(settings, "test-key")) failures.Add("Server change missed.");
             ReservationClient.ValidateCompatibility(new Health { ok = true }); // Legacy additive API.
+            foreach (var serverVersion in new[] { "1.4.3", "2.0.0", "3.0.0" })
+                ReservationClient.ValidateCompatibility(new System.Web.Script.Serialization.JavaScriptSerializer().Deserialize<Health>(
+                    "{\"ok\":true,\"version\":\"" + serverVersion + "\",\"apiVersion\":1}"));
             ReservationClient.ValidateCompatibility(new Health { ok = true, apiVersion = 1, capabilities = new[] { "secondary-label-tracking-v1" } }, true);
             foreach (var health in new[] { new Health { ok = true, apiVersion = 2 }, new Health { ok = true, minimumClientVersion = "99.0" }, new Health { ok = true, capabilities = new string[0] } })
             {

@@ -8,7 +8,7 @@ from zipfile import ZIP_DEFLATED, ZipFile
 
 FILES = (
     "app.py", "admin.py", "package_source.py", "Dockerfile", "docker-compose.yml",
-    "requirements.txt", ".env.example", ".dockerignore", "README.md", "VERSION",
+    "requirements.txt", ".env.example", ".dockerignore", "README.md", "VERSION", "CHANGELOG.md",
 )
 DIRECTORIES = {"web": {".html", ".js", ".css", ".ico", ".ttf", ".txt"},
                "tests": {".py"}, "licenses": {".txt", ".md", ""}}
