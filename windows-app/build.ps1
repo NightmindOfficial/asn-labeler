@@ -9,6 +9,7 @@ $licenseResources = @(
     "/resource:$project\NOTICE,AsnLabeler.NOTICE",
     "/resource:$project\LICENSE-BPAC-EXCEPTION.txt,AsnLabeler.BpacPermission",
     "/resource:$project\THIRD-PARTY-NOTICES.md,AsnLabeler.ThirdPartyNotices"
+    "/resource:$root\vendor\InnoSetup\LICENSE.txt,AsnLabeler.InnoSetup.LICENSE"
 )
 $dist = Join-Path $root $OutputDirectory
 $csc = "C:\Windows\Microsoft.NET\Framework64\v4.0.30319\csc.exe"
@@ -32,6 +33,7 @@ $src = Join-Path $root "src\Program.cs"
 $backends = Join-Path $root "src\PrinterBackends.cs"
 $matrix = Join-Path $root "src\DataMatrixLabels.cs"
 $copyLabels = Join-Path $root "src\CopyLabelForm.cs"
+$updates = Join-Path $root "src\Updates.cs"
 $localization = Join-Path $root "src\Localization.cs"
 $english = Join-Path $root "src\en.json"
 $zxing = Join-Path $root "vendor\ZXing.Net\zxing.dll"
@@ -74,7 +76,7 @@ $iconArg = if (Test-Path $icon) { "/win32icon:$icon" } else { $null }
   "/resource:$material,AsnLabeler.MaterialIcons.ttf" `
   "/resource:$materialLicense,AsnLabeler.MaterialIcons.LICENSE" `
   "/resource:$english,AsnLabeler.en.json" `
-  "$src" "$backends" "$matrix" "$copyLabels" "$localization" "$versionSource"
+  "$src" "$backends" "$matrix" "$copyLabels" "$localization" "$versionSource" "$updates"
 
 if ($LASTEXITCODE -ne 0) {
     throw "C# compiler failed with exit code $LASTEXITCODE"
@@ -83,6 +85,7 @@ if ($LASTEXITCODE -ne 0) {
 & $csc `
   /nologo `
   /target:exe `
+  /define:DEVELOPMENT `
   /codepage:65001 `
   "/win32manifest:$manifest" `
   /optimize+ `
@@ -106,7 +109,7 @@ if ($LASTEXITCODE -ne 0) {
   "/resource:$material,AsnLabeler.MaterialIcons.ttf" `
   "/resource:$materialLicense,AsnLabeler.MaterialIcons.LICENSE" `
   "/resource:$english,AsnLabeler.en.json" `
-  "$src" "$backends" "$matrix" "$copyLabels" "$localization" "$versionSource"
+  "$src" "$backends" "$matrix" "$copyLabels" "$localization" "$versionSource" "$updates"
 
 if ($LASTEXITCODE -ne 0) {
     throw "C# test compiler failed with exit code $LASTEXITCODE"

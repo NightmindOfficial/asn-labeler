@@ -27,7 +27,8 @@ namespace AsnLabeler
         public static string Read()
         {
             var text = new StringBuilder("ZXing.Net 0.16.11 - Copyright Michael Jahn and ZXing contributors\r\nhttps://github.com/micjahn/ZXing.Net\r\nApache License 2.0; unmodified assembly\r\n\r\nMaterial Icons - Google\r\nhttps://github.com/google/material-design-icons\r\nApache License 2.0; unmodified font\r\n\r\n");
-            foreach (string name in new[] { "AsnLabeler.NOTICE", "AsnLabeler.LICENSE", "AsnLabeler.BpacPermission", "AsnLabeler.ThirdPartyNotices", "AsnLabeler.ZXing.LICENSE", "AsnLabeler.MaterialIcons.LICENSE" })
+            text.AppendLine("Inno Setup 6.7.0 - Jordan Russell and Martijn Laan\r\nhttps://jrsoftware.org/\r\nUnmodified installer engine; separate Inno Setup License.\r\n");
+            foreach (string name in new[] { "AsnLabeler.NOTICE", "AsnLabeler.LICENSE", "AsnLabeler.BpacPermission", "AsnLabeler.ThirdPartyNotices", "AsnLabeler.ZXing.LICENSE", "AsnLabeler.MaterialIcons.LICENSE", "AsnLabeler.InnoSetup.LICENSE" })
                 using (var stream = typeof(ThirdPartyLicenses).Assembly.GetManifestResourceStream(name))
                 using (var reader = new StreamReader(stream))
                     text.AppendLine(name).AppendLine(reader.ReadToEnd()).AppendLine();
@@ -48,14 +49,20 @@ namespace AsnLabeler
 
         static DialogResult ShowCore(IWin32Window owner, string text, string title, MessageBoxButtons buttons, MessageBoxIcon icon, MessageBoxDefaultButton defaultButton)
         {
-            using (var dialog = new Form())
-            using (var body = new TextBox())
-            using (var actions = new FlowLayoutPanel())
-            using (var copy = new Button())
-            using (var close = new Button())
-            {
-                dialog.Text = title + " | " + AppRelease.Version;
+            using (var dialog = Create(text, title, buttons, icon, defaultButton)) return dialog.ShowDialog(owner);
+        }
+
+        internal static Form Create(string text, string title, MessageBoxButtons buttons, MessageBoxIcon icon, MessageBoxDefaultButton defaultButton)
+        {
+                bool diagnostic = icon == MessageBoxIcon.Error || (icon == MessageBoxIcon.Warning && buttons == MessageBoxButtons.OK);
+                var dialog = new Form();
+                var body = new TextBox();
+                var actions = new FlowLayoutPanel();
+                var close = new Button();
+                dialog.Text = diagnostic ? title + " | " + AppRelease.Version : title;
+                dialog.Icon = Icon.ExtractAssociatedIcon(Application.ExecutablePath);
                 dialog.Font = new Font("Segoe UI", 10);
+                dialog.AutoScaleDimensions = new SizeF(96, 96);
                 dialog.AutoScaleMode = AutoScaleMode.Dpi;
                 dialog.ClientSize = new Size(600, 280);
                 dialog.MinimumSize = new Size(420, 240);
@@ -63,6 +70,7 @@ namespace AsnLabeler
                 dialog.MinimizeBox = false;
                 dialog.MaximizeBox = false;
                 dialog.Padding = new Padding(16);
+                dialog.BackColor = Color.White;
                 body.Multiline = true;
                 body.ReadOnly = true;
                 body.ScrollBars = ScrollBars.Vertical;
@@ -77,48 +85,109 @@ namespace AsnLabeler
                 actions.FlowDirection = FlowDirection.RightToLeft;
                 close.Text = Loc.T("Schließen");
                 close.Size = new Size(120, 34);
+                close.AutoSize = true;
+                close.MinimumSize = new Size(120, 34);
                 close.DialogResult = DialogResult.OK;
-                copy.Text = Loc.T("Kopieren");
-                copy.Size = new Size(160, 34);
-                copy.Click += delegate
-                {
-                    try { Clipboard.SetText("ASN Labeler " + AppRelease.Version + "\r\n" + title + "\r\n" + text); copy.Text = Loc.T("Kopiert"); }
-                    catch (ExternalException) { copy.Text = Loc.T("Erneut kopieren"); }
-                };
                 actions.Controls.Add(close);
-                actions.Controls.Add(copy);
+                if (diagnostic)
+                {
+                    var copy = new Button { Name = "copyMessage", Text = Loc.T("Kopieren"), AutoSize = true, MinimumSize = new Size(160, 34) };
+                    copy.Click += delegate
+                    {
+                        try { Clipboard.SetText("ASN Labeler " + AppRelease.Version + "\r\n" + title + "\r\n" + text); copy.Text = Loc.T("Kopiert"); }
+                        catch (ExternalException) { copy.Text = Loc.T("Erneut kopieren"); }
+                    };
+                    actions.Controls.Add(copy);
+                }
                 var choices = new List<Button>();
                 if (buttons != MessageBoxButtons.OK)
                 {
                     close.Text = buttons == MessageBoxButtons.YesNo ? Loc.T("Nein") : Loc.T("Abbrechen");
                     close.DialogResult = buttons == MessageBoxButtons.YesNo ? DialogResult.No : DialogResult.Cancel;
-                    var positive = new Button { Text = buttons == MessageBoxButtons.OKCancel ? "OK" : Loc.T("Ja"), Size = new Size(120,34),
+                    var positive = new Button { Text = buttons == MessageBoxButtons.OKCancel ? "OK" : Loc.T("Ja"), AutoSize = true, MinimumSize = new Size(120,34),
                         DialogResult = buttons == MessageBoxButtons.OKCancel ? DialogResult.OK : DialogResult.Yes };
                     actions.Controls.Add(positive); choices.Add(positive);
                     if (buttons == MessageBoxButtons.YesNoCancel) {
-                        var negative = new Button { Text = Loc.T("Nein"), Size = new Size(120,34), DialogResult = DialogResult.No };
+                        var negative = new Button { Text = Loc.T("Nein"), AutoSize = true, MinimumSize = new Size(120,34), DialogResult = DialogResult.No };
                         actions.Controls.Add(negative); choices.Add(negative);
                     }
                 }
                 choices.Add(close);
-                dialog.Controls.Add(body);
+                if (diagnostic || text.Length > 2000) dialog.Controls.Add(body);
+                else
+                {
+                    body.Dispose();
+                    var content = new Panel { Dock = DockStyle.Fill, AutoScroll = true, Padding = new Padding(4, 8, 4, 8) };
+                    var message = new Label { Text = text, AutoSize = true, Dock = DockStyle.Top, ForeColor = Color.FromArgb(55, 65, 71) };
+                    content.SizeChanged += delegate { message.MaximumSize = new Size(Math.Max(1, content.ClientSize.Width - content.Padding.Horizontal - SystemInformation.VerticalScrollBarWidth), 0); };
+                    content.Controls.Add(message);
+                    dialog.Controls.Add(content);
+                    var heading = new Label { Text = title, Dock = DockStyle.Top, AutoSize = true, Font = new Font(dialog.Font, FontStyle.Bold), Padding = new Padding(4, 0, 4, 16) };
+                    dialog.Controls.Add(heading);
+                    close.BackColor = Color.FromArgb(0, 125, 98); close.ForeColor = Color.White;
+                    close.FlatStyle = FlatStyle.Flat; close.FlatAppearance.BorderSize = 0;
+                }
                 dialog.Controls.Add(actions);
                 dialog.AcceptButton = choices[Math.Min((int)defaultButton / 256, choices.Count - 1)];
                 dialog.CancelButton = close;
-                return dialog.ShowDialog(owner);
+                dialog.Load += delegate {
+                    using (var graphics = dialog.CreateGraphics()) {
+                        float scale = graphics.DpiX / 96f;
+                        bool simple = !diagnostic && text.Length <= 2000;
+                        int width = (int)((simple ? 520 : 600) * scale);
+                        int textHeight = TextRenderer.MeasureText(text, dialog.Font, new Size(width - (int)(64 * scale), Int32.MaxValue), TextFormatFlags.WordBreak | TextFormatFlags.TextBoxControl).Height;
+                        int height = simple ? Math.Min((int)(400 * scale), Math.Max((int)(160 * scale), textHeight + (int)(115 * scale))) : (int)(280 * scale);
+                        dialog.MinimumSize = new Size((int)(420 * scale), (int)((simple ? 160 : 240) * scale));
+                        dialog.ClientSize = new Size(width, height);
+                    }
+                };
+                return dialog;
+        }
+
+        internal static List<string> Validate(string snapshotPath = null)
+        {
+            var failures = new List<string>();
+            foreach (var icon in new[] { MessageBoxIcon.Information, MessageBoxIcon.Question, MessageBoxIcon.Warning, MessageBoxIcon.Error })
+            using (var form = Create(ClientUpdates.Text("Eine neue Version steht bereit. Einstellungen bleiben bei der Installation erhalten.", "A new version is available. Your settings will be preserved during installation."),
+                ClientUpdates.Text("Update verfügbar", "Update available"), MessageBoxButtons.OK, icon, MessageBoxDefaultButton.Button1))
+            {
+                bool diagnostic = icon == MessageBoxIcon.Error || icon == MessageBoxIcon.Warning;
+                if ((form.Controls.Find("copyMessage", true).Length != 0) != diagnostic) failures.Add("Unexpected popup copy action.");
+                form.StartPosition = FormStartPosition.Manual; form.Location = new Point(-20000, -20000); form.ShowInTaskbar = false;
+                form.Show(); Application.DoEvents();
+                foreach (Control control in form.Controls)
+                {
+                    if (!form.ClientRectangle.Contains(control.Bounds)) failures.Add("Popup control overflow.");
+                    foreach (Control other in form.Controls)
+                        if (other != control && control.Bounds.IntersectsWith(other.Bounds)) failures.Add("Popup control overlap.");
+                }
+                if (snapshotPath != null && icon == MessageBoxIcon.Information)
+                    using (var bitmap = new Bitmap(form.Width, form.Height))
+                    {
+                        form.DrawToBitmap(bitmap, new Rectangle(Point.Empty, form.Size));
+                        bitmap.Save(Path.Combine(Path.GetDirectoryName(snapshotPath), Path.GetFileNameWithoutExtension(snapshotPath) + "-info.png"), ImageFormat.Png);
+                    }
+                form.Close();
             }
+            return failures;
         }
     }
 
     static class Program
     {
         static Mutex singleInstanceMutex;
+        static Mutex runningMutex;
         public static readonly int BringToFrontMessage = NativeMethods.RegisterWindowMessage("ASN_LABELER_BRING_TO_FRONT");
 
         [STAThread]
         static int Main(string[] args)
         {
             EmbeddedBarcodeLibrary.Initialize();
+#if DEVELOPMENT
+            ClientRuntime.DevelopmentMode = args.Contains("--development") || args.Contains("--self-test");
+#endif
+            ServicePointManager.SecurityProtocol |= SecurityProtocolType.Tls12;
+            if (args.Length > 0 && args[0] == "--apply-update") return ClientUpdates.Apply(args);
             if (args.Length == 1 && args[0] == "--licenses")
             {
                 MessageBox.Show(ThirdPartyLicenses.Read(), Loc.T("Open-Source-Lizenzen"), MessageBoxButtons.OK, MessageBoxIcon.Information);
@@ -137,6 +206,8 @@ namespace AsnLabeler
                 SettingsForm.ValidateLayout(args[1]);
                 DocumentStatusForm.RenderSnapshot(args[1]);
                 CopyLabelForm.Validate(args[1]);
+                UpdateForm.ValidateLayout(args[1]);
+                AppDialogs.Validate(args[1]);
                 return 0;
             }
             if (args.Length == 2 && args[0] == "--render-barcodes")
@@ -154,6 +225,17 @@ namespace AsnLabeler
                 return 0;
             }
 
+            Mutex setup;
+            bool setupRunning;
+            try { setupRunning = Mutex.TryOpenExisting("Global\\AsnLabelerSetup", System.Security.AccessControl.MutexRights.Synchronize, out setup); }
+            catch (UnauthorizedAccessException) { setupRunning = true; setup = null; }
+            if (!args.Contains("--installed") && setupRunning)
+            {
+                if (setup != null) setup.Dispose();
+                MessageBox.Show("Setup is running. Please start ASN Labeler after installation finishes.", "ASN Labeler", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return 1;
+            }
+            if (setup != null) setup.Dispose();
             bool created;
             singleInstanceMutex = new Mutex(true, "Local\\AsnLabelerBrotherQl800", out created);
             if (!created)
@@ -162,6 +244,12 @@ namespace AsnLabeler
                 NativeMethods.TryBringExistingProcessToFront();
                 return 0;
             }
+            // Keep a shared presence handle alive across Windows sessions for Setup.
+            var security = new System.Security.AccessControl.MutexSecurity();
+            security.AddAccessRule(new System.Security.AccessControl.MutexAccessRule(
+                new System.Security.Principal.SecurityIdentifier(System.Security.Principal.WellKnownSidType.WorldSid, null),
+                System.Security.AccessControl.MutexRights.FullControl, System.Security.AccessControl.AccessControlType.Allow));
+            runningMutex = new Mutex(false, "Global\\AsnLabelerRunning", out created, security);
 
             Application.EnableVisualStyles();
             Application.SetCompatibleTextRenderingDefault(false);
@@ -172,6 +260,7 @@ namespace AsnLabeler
             };
 
             using (singleInstanceMutex)
+            using (runningMutex)
             {
                 bool restart;
                 do { Loc.Language = AppConfig.Load().Language; using (var form = new MainForm()) { Application.Run(form); restart = form.RestartRequested; } } while (restart);
@@ -316,6 +405,10 @@ namespace AsnLabeler
         MediaInfo detectedMedia;
         int animationStep;
         bool isBusy;
+        bool updateChecking;
+        ClientRelease pendingUpdate;
+        bool pendingBpacSetup;
+        string notifiedMinimum;
         bool isRefreshingNext;
         bool printerReady;
         bool serverReady;
@@ -336,6 +429,7 @@ namespace AsnLabeler
             SuspendLayout();
             this.testMode = testMode;
             Text = "Paperless ASN Labeler | " + AppRelease.Version;
+            if (ClientRuntime.DevelopmentMode) Text += " | DEVELOPMENT";
             ClientSize = new Size(900, 660);
             AutoScaleMode = AutoScaleMode.Dpi;
             FormBorderStyle = FormBorderStyle.Sizable;
@@ -352,7 +446,7 @@ namespace AsnLabeler
             titleLabel.Text = "ASN Labeler";
             titleLabel.Font = UiFont(24, FontStyle.Bold);
 
-            subtitleLabel.Text = "paperless-ngx + Brother QL-800";
+            subtitleLabel.Text = "paperless-ngx + Brother QL";
             subtitleLabel.ForeColor = Color.FromArgb(85, 91, 102);
             subtitleLabel.Font = UiFont(10, FontStyle.Regular);
 
@@ -474,7 +568,7 @@ namespace AsnLabeler
             previewStep.Controls.Add(countLabel);
 
             pollTimer.Interval = config.RefreshMilliseconds;
-            pollTimer.Tick += delegate { RefreshDocumentBadge(); RefreshNextNumber(true); };
+            pollTimer.Tick += delegate { OfferPendingUpdate(); if (IsDisposed || Disposing) return; RefreshDocumentBadge(); RefreshNextNumber(true); };
             pollTimer.Start();
 
             animationTimer.Interval = 60;
@@ -523,6 +617,74 @@ namespace AsnLabeler
                 }
             };
             FormClosing += delegate(object sender, FormClosingEventArgs e) { if (isBusy) e.Cancel = true; };
+            Shown += delegate { if (!testMode) CheckUpdates(false); };
+            Shown += delegate { if (!testMode) CheckInitialSetup(); };
+        }
+
+        async void CheckInitialSetup()
+        {
+            if (config.BpacSetupPrompted || config.DemoMode || ClientUpdates.InstallScope(Application.ExecutablePath) == null) return;
+            bool available = await Task.Run(() => { try { BpacPrinterSession.Probe(); return true; } catch { return false; } });
+            if (IsDisposed) return;
+            config.BpacSetupPrompted = true; config.Save();
+            pendingBpacSetup = !available;
+        }
+
+        async void CheckUpdates(bool manual)
+        {
+            if (testMode || updateChecking) return;
+            if (ClientUpdates.InstallScope(Application.ExecutablePath) == null)
+            {
+                if (manual) MessageBox.Show(this, ClientUpdates.Text("Updates sind nach der Installation mit Setup verfügbar.", "Updates are available after installing with Setup."), "Update", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return;
+            }
+            updateChecking = true;
+            try
+            {
+                pendingUpdate = await Task.Run(() => ClientUpdates.Check(manual));
+                if (IsDisposed) return;
+                Version required;
+                if (pendingUpdate != null && ClientRuntime.UpdateRequired &&
+                    (!Version.TryParse(ClientRuntime.RequiredVersion, out required) || ClientUpdates.ParseVersion(pendingUpdate.VersionText) < required)) pendingUpdate = null;
+                if (pendingUpdate == null && manual) MessageBox.Show(this, ClientRuntime.UpdateRequired
+                    ? ClientUpdates.Text("Der Server verlangt mindestens Client ", "The server requires client ") + ClientRuntime.RequiredVersion + ClientUpdates.Text(". Noch kein passendes Update verfügbar. Bitte den Administrator kontaktieren.", " or later. No matching update is available yet. Contact your administrator.")
+                    : ClientUpdates.Text("Die App ist aktuell.", "The app is up to date."), "Update", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                OfferPendingUpdate();
+            }
+            catch (Exception ex)
+            {
+                if (manual && !IsDisposed) MessageBox.Show(this, ex.Message, "Update", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            }
+            finally { updateChecking = false; }
+        }
+
+        void OfferPendingUpdate()
+        {
+            if (ClientRuntime.UpdateRequired && notifiedMinimum != ClientRuntime.RequiredVersion && !OperationRunning && !BpacPrinterSession.IsPrinting && ActiveForm == this && Enabled && !IsDisposed)
+            {
+                notifiedMinimum = ClientRuntime.RequiredVersion;
+                UpdateStepAvailability();
+                MessageBox.Show(this, ClientUpdates.Text("Dieser Server benötigt mindestens Client ", "This server requires client ") + notifiedMinimum + ClientUpdates.Text(". Bitte aktualisieren. Neue Druckaufträge sind gesperrt; Einstellungen und Diagnose bleiben verfügbar.", " or later. Please update. New print jobs are blocked; settings and diagnostics remain available."),
+                    ClientUpdates.Text("Update erforderlich", "Update required"), MessageBoxButtons.OK, MessageBoxIcon.Information);
+                CheckUpdates(true);
+                return;
+            }
+            if (pendingBpacSetup && !OperationRunning && ActiveForm == this && Enabled && !IsDisposed)
+            {
+                pendingBpacSetup = false;
+                if (MessageBox.Show(this, ClientUpdates.Text("b-PAC 64 Bit fehlt oder ist nicht verfügbar. Jetzt die Druckereinrichtung öffnen?", "b-PAC 64-bit is missing or unavailable. Open printer setup now?"),
+                    "Brother b-PAC", MessageBoxButtons.YesNo, MessageBoxIcon.Information) == DialogResult.Yes) OpenSettings(true);
+                return;
+            }
+            if (pendingUpdate == null || OperationRunning || BpacPrinterSession.IsPrinting || ActiveForm != this || !Enabled || IsDisposed) return;
+            var release = pendingUpdate; pendingUpdate = null;
+            pollTimer.Stop();
+            using (var dialog = new UpdateForm(release))
+            {
+                dialog.ShowDialog(this);
+                if (dialog.InstallRequested) { config.Save(); Close(); return; }
+            }
+            pollTimer.Start();
         }
 
         public static void RenderDemoSnapshot(string path)
@@ -605,6 +767,16 @@ namespace AsnLabeler
                 form.ApplyDemoReadyStateForTests();
                 form.LayoutMain();
                 form.AssertPanelChildrenInside("demo-ready-large", failures);
+                string previousMinimum = ClientRuntime.RequiredVersion;
+                try
+                {
+                    form.config.DemoMode = false;
+                    ClientRuntime.RequiredVersion = "99.0.0";
+                    form.UpdateStepAvailability();
+                    if (form.printButton.Enabled || !form.settingsButton.Enabled || !form.documentsButton.Enabled)
+                        failures.Add("Required update must block printing without blocking settings.");
+                }
+                finally { ClientRuntime.RequiredVersion = previousMinimum; form.config.DemoMode = true; form.UpdateStepAvailability(); }
                 if (form.serverStep.Top >= form.printerStep.Top || form.printerStep.Top >= form.previewStep.Top ||
                     form.serverBadge.Text != "1" || form.printerBadge.Text != "2") failures.Add("Server-first order is incorrect.");
                 form.printerReady = false;
@@ -1035,15 +1207,18 @@ namespace AsnLabeler
         }
 
 
-        void OpenSettings()
+        void OpenSettings(bool printerSetup = false)
         {
             if (OperationRunning) return;
             string previousLanguage = config.Language;
             var previousSettings = new SettingsSnapshot(config);
             pollTimer.Stop();
+            bool checkUpdates = false;
             using (var form = new SettingsForm(config))
             {
+                if (printerSetup) form.SelectPrinterSetup();
                 var result = form.ShowDialog(this);
+                checkUpdates = form.CheckUpdatesRequested;
                 if (result == DialogResult.OK || form.ResetPerformed)
                 {
                     config.Save();
@@ -1067,6 +1242,7 @@ namespace AsnLabeler
             }
             pollTimer.Interval = config.RefreshMilliseconds;
             pollTimer.Start();
+            if (checkUpdates) CheckUpdates(true);
         }
 
         void RefreshNextNumber(bool quiet)
@@ -1302,6 +1478,7 @@ namespace AsnLabeler
         void PrintNext()
         {
             if (!Enabled || OperationRunning) return;
+            if (!config.DemoMode && ClientRuntime.UpdateRequired) return;
             if (!printerReady || !serverReady || !nextReady || !previewValid)
             {
                 SetBanner(Loc.T("Bitte erst Schritt 1 und 2 erfolgreich abschließen."), false);
@@ -1567,7 +1744,7 @@ namespace AsnLabeler
             bool serverComplete = serverReady && nextReady;
             bool canUsePrinter = !OperationRunning && serverComplete;
             bool canUseServer = !OperationRunning;
-            bool canUsePreview = !OperationRunning && printerReady && serverReady && nextReady && previewValid;
+            bool canUsePreview = !OperationRunning && printerReady && serverReady && nextReady && previewValid && (config.DemoMode || !ClientRuntime.UpdateRequired);
             settingsButton.Enabled = !OperationRunning;
             documentsButton.Enabled = !OperationRunning;
             activity.Visible = OperationRunning;
@@ -1949,6 +2126,7 @@ namespace AsnLabeler
         bool searching;
 
         public bool ResetPerformed { get; private set; }
+        public bool CheckUpdatesRequested { get; private set; }
         public string ResetNextBarcodeText { get; private set; }
 
         public SettingsForm(AppConfig config) : this(config, false) { }
@@ -1983,20 +2161,20 @@ namespace AsnLabeler
             demoMode.SetBounds(22, 436, 300, 28);
             demoMode.CheckedChanged += delegate { UpdateDemoSettingsState(); };
 
-            AddSection("Brother QL-800", 214);
+            AddSection("Brother QL", 214);
             var connectionLabel = new Label { Text = Loc.T("Anbindung"), Font = new Font(Font, FontStyle.Bold) };
             connectionLabel.SetBounds(22, 248, 148, 26);
             setupBpacButton.Text = Loc.T("Brother / b-PAC einrichten…");
             setupBpacButton.SetBounds(180, 242, 476, 36);
             setupBpacButton.Click += delegate
             {
-                string instructions = Loc.T("1. Offiziellen Brother QL-800-Treiber installieren. P-touch muss drucken können.\r\n\r\n") +
+                string instructions = ClientUpdates.Text("1. Offiziellen Brother-Treiber für das gewählte Modell installieren. P-touch muss drucken können.\r\n\r\n", "1. Install the official Brother driver for your model. Printing from P-touch must work.\r\n\r\n") +
                     Loc.T("2. Von Brother den b-PAC Client Component Installer in 64 Bit herunterladen und ausführen. Das vollständige SDK ist nicht erforderlich.\r\n\r\n") +
                     Loc.T("3. Danach hier erneut nach dem Drucker suchen. Windows kann für die Installation Administratorrechte verlangen.\r\n\r\n") +
                     Loc.T("WinUSB wird nicht mehr verwendet. Falls der USB-Treiber zuvor ersetzt wurde, den offiziellen Brother-Treiber wiederherstellen.\r\n\r\n") +
                     Loc.T("Die offizielle Brother-Downloadseite jetzt öffnen?");
                 if (MessageBox.Show(this, instructions, Loc.T("b-PAC einrichten"), MessageBoxButtons.YesNo, MessageBoxIcon.Information) == DialogResult.Yes)
-                    try { Process.Start(new ProcessStartInfo("https://support.brother.com/g/s/es/dev/en/bpac/download/index.html") { UseShellExecute = true }); }
+                    try { Process.Start(new ProcessStartInfo("https://support.brother.com/g/s/es/dev/en/bpac/download/index.html?c=eu_ot&comple=on&lang=en&navi=offall&redirect=on") { UseShellExecute = true }); }
                     catch (Exception ex) { MessageBox.Show(this, ex.Message, Loc.T("Downloadseite nicht geöffnet"), MessageBoxButtons.OK, MessageBoxIcon.Error); }
             };
             Controls.Add(connectionLabel);
@@ -2010,7 +2188,7 @@ namespace AsnLabeler
             apiKey.Text = testMode ? "" : CredentialStore.Read("AsnLabeler.ApiKey") ?? "";
             demoMode.Checked = config.DemoMode;
 
-            findDeviceButton.Text = Loc.T("Brother QL-800 suchen");
+            findDeviceButton.Text = ClientUpdates.Text("Brother QL suchen", "Find Brother QL");
             findDeviceButton.SetBounds(180, 310, 200, 36);
             findDeviceButton.Click += delegate { ScanBrotherDevices(); };
 
@@ -2221,6 +2399,9 @@ namespace AsnLabeler
             place(printer,findDeviceButton,20,190,276,38); place(printer,diagnoseButton,308,190,282,38);
             label(printer,Loc.T("Rollenprofil"),250); place(printer,rollProfile,200,246,390,30);
             place(printer,testLabelButton,308,304,282,38);
+            var models = new Button { Text = ClientUpdates.Text("Unterstützte Drucker", "Supported printers") };
+            models.Click += delegate { MessageBox.Show(this, PrinterBackends.ModelOverview(), ClientUpdates.Text("Druckermodelle", "Printer models"), MessageBoxButtons.OK, MessageBoxIcon.Information); };
+            place(printer,models,20,304,276,38);
             place(maintenance,resetAsnButton,20,24,570,40);
             place(copies,copyLabelButton,20,24,570,40);
             place(copies,new Label { Text = Loc.T("Stellvertreterkarte (A4)"), Font = new Font(Font, FontStyle.Bold) },20,104,570,28);
@@ -2238,7 +2419,10 @@ namespace AsnLabeler
             place(about,new Label { Text = Loc.T("AGPLv3 mit zusätzlicher b-PAC-Erlaubnis. Ohne Gewährleistung."), ForeColor = Color.DimGray },20,184,570,40);
             var licenses = new Button { Text = Loc.T("Open-Source-Lizenzen") };
             licenses.Click += delegate { MessageBox.Show(this,ThirdPartyLicenses.Read(),Loc.T("Open-Source-Lizenzen"),MessageBoxButtons.OK,MessageBoxIcon.Information); };
-            place(about,licenses,20,236,570,40);
+            place(about,licenses,20,236,276,40);
+            var updates = new Button { Text = ClientUpdates.Text("Nach Updates suchen", "Check for updates") };
+            updates.Click += delegate { CheckUpdatesRequested = true; Close(); };
+            place(about,updates,308,236,282,40);
             place(about,new Label { Text = Loc.T("Brother b-PAC und Druckertreiber werden separat installiert. Windows-Schriften werden nicht mitgeliefert."), ForeColor = Color.DimGray },20,292,570,52);
             resetProgress.SetBounds(24,488,632,4); Controls.Add(resetProgress);
             foreach (var control in previousControls) if (control.Parent == null) control.Dispose();
@@ -2269,6 +2453,7 @@ namespace AsnLabeler
                     PrinterName = deviceList.SelectedItem == null ? config.PrinterName : deviceList.SelectedItem.ToString(),
                     PfRollProfile = rollProfile.SelectedIndex == 1,
                     ShowCompleted = config.ShowCompleted,
+                    BpacSetupPrompted = config.BpacSetupPrompted,
                     RefreshSeconds = (int)refreshSeconds.Value,
                     Language = languageChoice.SelectedIndex == 1 ? "en" : "de"
                 };
@@ -2310,6 +2495,8 @@ namespace AsnLabeler
             }
             ResumeLayout(false);
         }
+
+        internal void SelectPrinterSetup() { settingsTabs.SelectedIndex = 2; }
 
         internal static List<string> ValidateLayout(string snapshotPath = null)
         {
@@ -2935,6 +3122,7 @@ namespace AsnLabeler
 
     sealed class AppConfig
     {
+        public bool BpacSetupPrompted;
         public string ServerUrl = "http://nas.local:8765";
         public string DevicePath = "";
         public string PrinterBackend = PrinterBackends.Brother;
@@ -3021,6 +3209,7 @@ namespace AsnLabeler
             data["ShowCompleted"] = ShowCompleted;
             data["RefreshSeconds"] = RefreshMilliseconds / 1000;
             data["Language"] = Language == "en" ? "en" : "de";
+            data["BpacSetupPrompted"] = BpacSetupPrompted;
             File.WriteAllText(ConfigPath, new JavaScriptSerializer().Serialize(data));
         }
 
@@ -3068,7 +3257,11 @@ namespace AsnLabeler
             Version minimum;
             if (!string.IsNullOrEmpty(health.minimumClientVersion) &&
                 (!Version.TryParse(health.minimumClientVersion, out minimum) || new Version(AppRelease.NumericVersion) < minimum))
+            {
+                Volatile.Write(ref ClientRuntime.RequiredVersion, health.minimumClientVersion);
                 throw new InvalidOperationException(Loc.T("Veralteter Client. Bitte den Client aktualisieren."));
+            }
+            Volatile.Write(ref ClientRuntime.RequiredVersion, null);
             if (secondaryLabels && (health.capabilities == null || !health.capabilities.Contains("secondary-label-tracking-v1")))
                 throw new InvalidOperationException(Loc.T("Bitte zuerst den Reservierungsdienst auf Version 1.4.3 oder neuer aktualisieren. Kein Sekundärlabel gedruckt."));
         }
@@ -3130,6 +3323,7 @@ namespace AsnLabeler
 
         T Request<T>(string method, string path, bool requireAuth, object payload = null)
         {
+            if (requireAuth) ClientRuntime.RequireInstallation();
             if (string.IsNullOrWhiteSpace(config.ServerUrl)) throw new InvalidOperationException(Loc.T("Server URL fehlt."));
             string apiKey = apiKeyOverride ?? config.ApiKey;
             if (requireAuth && string.IsNullOrWhiteSpace(apiKey)) throw new InvalidOperationException(Loc.T("API-Key fehlt."));
@@ -3171,6 +3365,11 @@ namespace AsnLabeler
                 {
                     ApiError error = null;
                     try { error = json.Deserialize<ApiError>(reader.ReadToEnd()); } catch (ArgumentException) { } catch (InvalidOperationException) { }
+                    if (error != null && error.errorCode == "client_update_required")
+                    {
+                        Volatile.Write(ref ClientRuntime.RequiredVersion, error.minimumClientVersion ?? "?");
+                        throw new InvalidOperationException(ClientUpdates.Text("Update erforderlich. Mindestversion: ", "Update required. Minimum version: ") + ClientRuntime.RequiredVersion, ex);
+                    }
                     throw new InvalidOperationException("API HTTP " + (int)response.StatusCode + ": " +
                         (error == null ? Loc.T("Anfrage nicht bestätigt.") : Loc.ApiError(error.errorCode, error.error)) +
                         (error == null || String.IsNullOrEmpty(error.requestId) ? "" : "\nRequest-ID: " + error.requestId), ex);
@@ -3181,6 +3380,7 @@ namespace AsnLabeler
 
     sealed class ApiError
     {
+        public string minimumClientVersion { get; set; }
         public string errorCode { get; set; }
         public string error { get; set; }
         public string requestId { get; set; }
@@ -3943,12 +4143,17 @@ namespace AsnLabeler
                     }
                 }
                 failures.AddRange(DataMatrixTests.Run());
+                failures.AddRange(ClientUpdates.Validate());
+                failures.AddRange(AppDialogs.Validate());
+                failures.AddRange(UpdateForm.ValidateLayout());
                 if (AsnNumber.Parse("ASN00123") != 123) failures.Add("ASN parser rejected prefixed value.");
                 if (AsnNumber.Parse("00124") != 124) failures.Add("ASN parser rejected numeric value.");
                 if (AsnNumber.Format(125) != "ASN00125") failures.Add("ASN formatter padding changed.");
                 failures.AddRange(MainForm.ValidateLayoutForTests());
                 failures.AddRange(SettingsForm.ValidateLayout());
                 Loc.Language = "en";
+                failures.AddRange(AppDialogs.Validate());
+                failures.AddRange(UpdateForm.ValidateLayout());
                 failures.AddRange(SettingsForm.ValidateLayout());
                 if (Loc.T("Einstellungen") != "Settings" || Loc.T("ASN00001") != "ASN00001") failures.Add("Localization fallback failed.");
                 Loc.Language = "de";

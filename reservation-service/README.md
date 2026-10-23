@@ -7,6 +7,15 @@ Das Adminpanel ist unter `/admin/` erreichbar. Version und API-Faehigkeiten lief
 
 ## Voraussetzungen
 
+Ab Service 2.0 wird Client 2.0 oder neuer benoetigt. Zuerst den Client per Setup
+installieren, dann den Service aktualisieren. Die Versionssperre gilt fuer neue
+Clientaktionen; bestehende eigene Druckauftraege duerfen noch bestaetigt werden.
+Adminpanel und administrative Werkzeuge bleiben mit separatem Admin-Key erreichbar.
+`MINIMUM_CLIENT_VERSION` kann fuer Sicherheitsupdates angehoben werden; nach
+Aenderung den Dienst neu bereitstellen. Der im Release eingebaute Mindeststand
+kann dadurch nicht abgesenkt werden. Es wird nicht pauschal die neueste
+GitHub-Version erzwungen, und ein GitHub-Ausfall sperrt keinen zugelassenen Client.
+
 - Docker mit Compose, etwa die Docker-Projektverwaltung eines NAS.
 - Eine erreichbare paperless-ngx-Instanz und ein API-Token mit Leserechten auf
   alle Dokumente des verwendeten ASN-Nummernkreises.
@@ -30,6 +39,7 @@ Das Adminpanel ist unter `/admin/` erreichbar. Version und API-Faehigkeiten lief
    | `ADMIN_API_KEYS` | Separate Admin-Schluessel, mindestens 32 Zeichen je Schluessel |
    | `RESERVATION_TTL_SECONDS` | Lebensdauer nie gestarteter Reservierungen; Standard 300, Bereich 30 bis 3600 |
    | `PRINTING_SETTLE_SECONDS` | Wartezeit vor Anzeige eines unbestaetigten Drucks als unklar; Standard 30, mindestens 10 |
+   | `MINIMUM_CLIENT_VERSION` | Mindestversion des Clients, Standard 2.0.0; kann fuer Sicherheitsupdates angehoben werden |
    | `SQLITE_PATH` | Datenbank im persistenten Volume, Standard `/data/reservations.sqlite3` |
    | `NAS_BIND_IP` | Hostadresse fuer Port 8765; Standard `127.0.0.1` |
 

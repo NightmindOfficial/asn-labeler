@@ -91,6 +91,7 @@ namespace AsnLabeler
         {
             config.NormalizePrinterBackend();
             var selected = Select(DiscoverBrother(), config.PrinterName);
+            RequireProductionModel(selected);
             if (String.IsNullOrWhiteSpace(config.PrinterName)) { config.PrinterName = selected.Name; config.Save(); }
             return new BpacPrinterSession(selected, config.UsePfRightAligned);
         }
@@ -106,7 +107,7 @@ namespace AsnLabeler
                     using (printer)
                     {
                         string driver = Convert.ToString(printer["DriverName"]);
-                        if (IsQl800Driver(driver))
+                        if (KnownModel(driver) != null)
                             result.Add(new PrinterChoice { Name = Convert.ToString(printer["Name"]), Driver = driver,
                                 Port = Convert.ToString(printer["PortName"]), Offline = Convert.ToBoolean(printer["WorkOffline"] ?? false) });
                     }
@@ -119,6 +120,26 @@ namespace AsnLabeler
                 @"\bBrother\b.*\bQL-800\b", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
         }
 
+        internal static string KnownModel(string driver)
+        {
+            if (driver == null) return null;
+            var match = System.Text.RegularExpressions.Regex.Match(driver,
+                @"\bBrother\b.*\b(QL-800|QL-810W|QL-820NWB)(?![A-Za-z0-9])", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+            return match.Success ? match.Groups[1].Value.ToUpperInvariant() : null;
+        }
+        internal static void RequireProductionModel(PrinterChoice printer)
+        {
+            if (!IsQl800Driver(printer.Driver)) throw new InvalidOperationException(ClientUpdates.Text(
+                "Dieses Modell ist experimentell. Nur Testdruck und Diagnose sind freigegeben; ASN-Druck benötigt eine Hardware-Abnahme.",
+                "This model is experimental. Only test printing and diagnostics are enabled; ASN printing requires hardware validation."));
+        }
+        public static string ModelOverview()
+        {
+            return ClientUpdates.Text(
+                "QL-800: bestätigt unterstützt.\r\nQL-810W: experimentell, nur Testdruck/Diagnose.\r\nQL-820NWB: experimentell, nur Testdruck/Diagnose.\r\n\r\nNeue Modelle werden zunächst lokal über USB geprüft. Eine b-PAC-Kompatibilität allein bestätigt weder Medienerkennung noch sicheren Druckabschluss. Andere QL-Modelle und Netzwerkdruck sind noch nicht freigegeben.",
+                "QL-800: validated support.\r\nQL-810W: experimental, test printing/diagnostics only.\r\nQL-820NWB: experimental, test printing/diagnostics only.\r\n\r\nNew models are initially evaluated using local USB. b-PAC compatibility alone does not validate media detection or reliable print completion. Other QL models and network printing are not yet approved.");
+        }
+
         internal static PrinterChoice Select(List<PrinterChoice> printers, string selected)
         {
             if (!String.IsNullOrWhiteSpace(selected))
@@ -127,8 +148,8 @@ namespace AsnLabeler
                 if (match == null) throw new InvalidOperationException(Loc.T("Der ausgewählte Brother-Drucker fehlt. Bitte in den Einstellungen erneut suchen."));
                 return match;
             }
-            if (printers.Count == 0) throw new InvalidOperationException(Loc.T("Kein lokal installierter Brother-QL-800-Treiber gefunden. Windows-Drucker und Brother-Treiber prüfen."));
-            if (printers.Count > 1) throw new InvalidOperationException(Loc.T("Mehrere QL-800-Drucker gefunden. Bitte in den Einstellungen einen auswählen."));
+            if (printers.Count == 0) throw new InvalidOperationException(ClientUpdates.Text("Kein unterstützter Brother-QL-Treiber gefunden. Windows-Drucker und Brother-Treiber prüfen.", "No supported Brother QL driver found. Check Windows printers and the Brother driver."));
+            if (printers.Count > 1) throw new InvalidOperationException(ClientUpdates.Text("Mehrere Brother-QL-Drucker gefunden. Bitte in den Einstellungen auswählen.", "Multiple Brother QL printers found. Select one in Settings."));
             return printers[0];
         }
 
@@ -146,7 +167,7 @@ namespace AsnLabeler
             try
             {
                 var printers = DiscoverBrother();
-                report.AppendLine("QL-800-Warteschlangen: " + printers.Count);
+                report.AppendLine("QL-Warteschlangen: " + printers.Count);
                 foreach (var p in printers) report.AppendLine(p.Name + " | " + p.Driver + " | " + p.Port + " | Windows-Offline=" + p.Offline);
             }
             catch (Exception ex) { report.AppendLine("Windows-Suche: " + ex.GetType().Name + " (0x" + ex.HResult.ToString("X8") + ")"); }
@@ -158,7 +179,7 @@ namespace AsnLabeler
                 if (backend == Brother) report.AppendLine(BpacPrinterSession.TestPrint(printer, false, correctionMm, rightAligned));
             }
             catch (Exception ex) { report.AppendLine(ex.Message); }
-            report.AppendLine("b-PAC-ASN-Druck aktiv. Abschluss: Printed(0) und Printer.ErrorCode=0. Scanbarkeit am physischen Label pruefen.");
+            report.AppendLine("ASN-Druck nur auf freigegebenen Modellen. Abschluss: Printed(0) und Printer.ErrorCode=0. Scanbarkeit am physischen Label pruefen.");
             report.AppendLine("Letzter b-PAC-Aufruffehler (diese Sitzung): " + BpacPrinterSession.LastFailure);
             report.AppendLine("Letzte Testlabel-Geometrie (diese Sitzung): " + BpacPrinterSession.LastGeometry);
             report.AppendLine("Keine API-Schlüssel, Serveradressen oder Dokumentdaten enthalten.");
@@ -195,6 +216,7 @@ namespace AsnLabeler
     sealed class BpacPrinterSession : IPrinterSession
     {
         static int testInFlight;
+        internal static bool IsPrinting { get { return Volatile.Read(ref testInFlight) != 0; } }
         static string lastFailure;
         static string lastGeometry;
         internal static string LastFailure { get { return Volatile.Read(ref lastFailure) ?? "Keiner aufgezeichnet."; } }
@@ -438,6 +460,10 @@ namespace AsnLabeler
         static string PrintLabel(PrinterChoice selected, string payload, bool sendToPrinter,
             double correctionMm, bool rightAligned, MediaInfo expectedMedia, Action beforeSend, bool cutAfter = true, bool copy = false)
         {
+            if (beforeSend != null || copy) PrinterBackends.RequireProductionModel(selected);
+            if (!PrinterBackends.IsQl800Driver(selected.Driver) &&
+                !System.Text.RegularExpressions.Regex.IsMatch(selected.Port ?? "", @"\AUSB[0-9]+:?\z", System.Text.RegularExpressions.RegexOptions.IgnoreCase))
+                throw new InvalidOperationException(ClientUpdates.Text("Experimentelle Modelle bitte per USB anschließen.", "Please connect experimental models via USB."));
             if (Interlocked.CompareExchange(ref testInFlight, 1, 0) != 0)
                 throw new InvalidOperationException(Loc.T("Ein b-PAC-Auftrag ist noch aktiv oder blockiert. Keinen weiteren Auftrag senden."));
             var deadline = new SubmissionDeadline(TimeSpan.FromSeconds(85));
@@ -952,6 +978,11 @@ namespace AsnLabeler
                 failures.Add("Unknown b-PAC errors are not preserved.");
             if (!PrinterBackends.IsQl800Driver("Brother QL-800") || PrinterBackends.IsQl800Driver("Brother QL-8000") || PrinterBackends.IsQl800Driver("Brother QL-810W"))
                 failures.Add("Printer driver model matching failed.");
+            if (PrinterBackends.KnownModel("Brother QL-810W") != "QL-810W" || PrinterBackends.KnownModel("Brother QL-820NWB") != "QL-820NWB" || PrinterBackends.KnownModel("Brother QL-8000") != null)
+                failures.Add("Experimental model matching failed.");
+            foreach (string model in new[] { "Brother QL-810W", "Brother QL-820NWB" })
+                try { PrinterBackends.RequireProductionModel(new PrinterChoice { Driver = model }); failures.Add("Experimental production printing allowed."); }
+                catch (InvalidOperationException) { }
             var a = new PrinterChoice { Name = "Mein Labeldrucker", Driver = "Brother QL-800" };
             var b = new PrinterChoice { Name = "Zweiter Drucker" };
             if (PrinterBackends.Select(new List<PrinterChoice> { a }, "") != a) failures.Add("Unique printer was not selected.");

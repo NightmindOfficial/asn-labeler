@@ -141,5 +141,5 @@ class CopyLabelTests(unittest.TestCase):
         headers = {"Authorization": "Bearer secret", "X-ASN-API-Version": "2"}
         self.assertEqual(call("/api/reservations/next", headers, "POST"), 409)
         with mock.patch.object(self.app, "paperless_max_asn", return_value=0):
-            self.assertEqual(call("/api/reservations/next", {"Authorization": "Bearer secret"}), 200)
-            self.assertEqual(call("/api/reservations/next", {"Authorization": "Bearer secret", "X-ASN-API-Version": "1"}), 200)
+            self.assertEqual(call("/api/reservations/next", {"Authorization": "Bearer secret"}), 426)
+            self.assertEqual(call("/api/reservations/next", {"Authorization": "Bearer secret", "X-ASN-Client-Version": "2.0.0", "X-ASN-API-Version": "1"}), 200)
