@@ -14,7 +14,7 @@ from zipfile import ZIP_DEFLATED, ZIP_STORED, ZipFile
 
 ROOT = Path(__file__).resolve().parent
 sys.path.insert(0, str(ROOT / "tools"))
-from release_common import read_version, write_manifest
+from release_common import asset_names, read_version, write_manifest
 SERVICE = ROOT / "reservation-service"
 PUBLIC_DOCUMENTS = (
     "README.md", "CHANGELOG.md", "THIRD-PARTY-NOTICES.md",
@@ -29,10 +29,10 @@ def client_source_files(root):
     files = [root / name for name in PUBLIC_DOCUMENTS]
     files.extend(root / name for name in (
         "LICENSE", "NOTICE", "LICENSE-BPAC-EXCEPTION.txt", "package-release.py",
-        "windows-app/build.ps1", "windows-app/VERSION", ".gitignore", ".gitattributes",
+        "windows-app/build.ps1", "windows-app/build-installer.ps1", "windows-app/VERSION", ".gitignore", ".gitattributes",
         ".github/workflows/ci.yml",
     ))
-    for folder in ("src", "assets", "vendor", "tests", "tools"):
+    for folder in ("src", "assets", "vendor", "tests", "tools", "installer"):
         files.extend(path for path in (root / "windows-app" / folder).rglob("*")
                      if path.is_file() and "__pycache__" not in path.parts
                      and path.suffix not in (".pyc", ".download"))
@@ -53,9 +53,9 @@ def main():
     component = parser.parse_args().component
     version = read_version(ROOT, component)
     output = ROOT / "artifacts" / component / version
-    executable = ROOT / "windows-app/dist/asn-labeler.exe"
+    executable = ROOT / "windows-app/dist" / asset_names(version, "client")[0]
     if component == "client" and not executable.is_file():
-        raise SystemExit("Build the Windows client with windows-app/build.ps1 first.")
+        raise SystemExit("Build the client and installer with windows-app/build.ps1 and build-installer.ps1 first.")
     source_zip = ROOT / "windows-app/vendor/ZXing.Net/source-v0.16.11.0.zip"
     if component == "client" and (not source_zip.is_file() or hashlib.sha256(source_zip.read_bytes()).hexdigest() != "71645fb22540334081d74ed5bb51c65037a8a774bf5b7d505f9cf7c3c8de80bf"):
         raise SystemExit("Verified ZXing source required. Run windows-app/tools/fetch-zxing-source.ps1 first.")
@@ -77,7 +77,7 @@ def main():
                 add(archive, path, ROOT)
             for path in client_source_files(ROOT):
                 add(archive, path, ROOT)
-        shutil.copyfile(executable, output / "asn-labeler.exe")
+        shutil.copyfile(executable, output / executable.name)
     write_manifest(output, version, os.environ.get("GITHUB_SHA"), component)
     print(component, "release packages written to", output)
 

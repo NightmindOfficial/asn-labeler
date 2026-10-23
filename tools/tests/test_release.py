@@ -112,6 +112,9 @@ class ReleaseSelectionTests(unittest.TestCase):
 
 
 class ArtifactTests(unittest.TestCase):
+    def test_client_2_uses_setup_not_portable(self):
+        self.assertEqual(asset_names("2.0.0", "client"), ["asn-labeler-2.0.0-setup.exe", "asn-labeler-2.0.0-source.zip"])
+        self.assertEqual(asset_names("1.4.3", "client")[0], "asn-labeler.exe")
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)

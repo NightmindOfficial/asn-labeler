@@ -98,6 +98,17 @@ jobs:
       - name: Fetch verified third-party source
         if: needs.metadata.outputs.client_release == 'true'
         run: ./windows-app/tools/fetch-zxing-source.ps1
+      - name: Install pinned Inno Setup compiler
+        if: needs.metadata.outputs.client_release == 'true'
+        run: ./windows-app/tools/setup-inno.ps1
+      - name: Build Windows installer
+        if: needs.metadata.outputs.client_release == 'true'
+        run: ./windows-app/build-installer.ps1
+      - name: Installer lifecycle smoke test
+        if: needs.metadata.outputs.client_release == 'true'
+        run: |
+          ./windows-app/tests/test-installer.ps1 -Scope user
+          ./windows-app/tests/test-installer.ps1 -Scope machine
       - name: Package release and source
         if: needs.metadata.outputs.client_release == 'true'
         run: python package-release.py client

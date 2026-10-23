@@ -13,35 +13,19 @@ Ein Branch und ein Pull Request koennen eine oder beide Komponenten aendern.
 Nur betroffene Komponenten erhalten hoehere Versionen und Release Notes unter
 genau einer nicht leeren Ueberschrift `## X.Y.Z`.
 
-## Einmalige GitHub-Einrichtung
+## Ablauf
 
-1. Entwicklungsbranch pushen und PR gegen `main` oeffnen. Checks laufen lassen.
-2. Settings > Actions > General: GitHub Actions und die verwendeten offiziellen
-   Actions erlauben. Nur Publish benoetigt `contents: write`. Keine persoenlichen
-   Tokens oder Brother-Komponenten als Secrets erforderlich.
-3. Settings > Rules > Rulesets: aktiven Branch-Ruleset fuer `main` anlegen.
-   Pull Request und Statuscheck **CI gate** verlangen, Branch-Aktualitaet vor dem
-   Merge verlangen, Force-Pushes und Loeschen blockieren. Quelle: GitHub Actions.
-   Keine regulaere Bypass-Ausnahme; allein keine zweite Genehmigung verlangen.
-4. Der Check ist nach dem ersten Lauf auswaehlbar. Ohne Ruleset verhindern Tests
-   keinen Merge technisch. GitHub-Runner und Docker-Start erstmals pruefen.
-5. Ersten gruenen PR mergen. Der Import veroeffentlicht `client-v1.4.3` und
-   `server-v1.4.3`, sofern noch nicht vorhanden. Alte Tags wie `v1.4.3` bleiben
-   unangetastet und gehoeren nicht zu den neuen getrennten Release-Reihen.
-
-## Normaler Ablauf
-
-1. `main` aktualisieren, Entwicklungsbranch anlegen, implementieren und lokal testen.
+1. In GitHub Desktop auf `main` wechseln, Fetch/Pull ausfuehren und von diesem aktuellen Stand einen neuen Entwicklungsbranch anlegen. Einen bereits gemergten Branch nicht fuer die naechste Version weiterverwenden. Implementieren und lokal testen.
 2. VERSION und CHANGELOG nur der geaenderten Komponenten aktualisieren.
 3. Committen, pushen und einen PR erstellen. Keine Laufzeitdaten committen.
-4. GitHub prueft Metadaten, Service-Tests, Windows-Build/Selbsttests, Paketgrenzen
-   und Docker-Start. Beide Komponenten werden weiterhin getestet und gebaut.
+4. GitHub prueft Metadaten, Service-Tests, Windows-Build/Selbsttests, Paketgrenzen und Docker-Start. Beide Komponenten werden weiterhin getestet und gebaut.
 5. Nach gruenen Checks und erforderlichen Hardwaretests mergen.
-6. Auf `main` wiederholt GitHub die Pruefungen. Nur Komponenten mit ausstehender
-   Veroeffentlichung erhalten Release-Pakete und einen eigenen GitHub Release.
+6. Auf `main` wiederholt GitHub die Pruefungen. Nur Komponenten mit ausstehender Veroeffentlichung erhalten Release-Pakete und einen eigenen GitHub Release.
+7. Unter Actions den erfolgreichen `main`-Lauf inklusive **Publish release** bestaetigen. Unter Releases die erwarteten Komponentenversionen und Downloads pruefen. Erst danach die gewuenschten Installationen aktualisieren.
 
-Nur Client geaendert: `client-v1.5.0`. Nur Server geaendert: `server-v1.4.4`.
-Beide geaendert: zwei Releases aus einem Commit, ohne zweiten PR oder manuelle Tags.
+PR-Titel und Beschreibung sind frei waehlbar. VERSION und CHANGELOG bestimmen die Veroeffentlichung. Eine reine Aenderung dieser Anleitung braucht keinen Bump.
+
+Nur Client geaendert: `client-v1.5.0`. Nur Server geaendert: `server-v1.4.4`. Beide geaendert: zwei Releases aus einem Commit, ohne zweiten PR oder manuelle Tags.
 
 Die Checks blockieren Versionsrueckschritte, Wiederverwendung bereits getaggter
 neuer Versionen und Aenderungen innerhalb einer Komponente ohne Bump. Tests und
@@ -69,26 +53,39 @@ nicht automatisch umgeschrieben; bei Konflikt bewusst pruefen oder neue Version 
 
 Zwei Releases sind keine atomare Transaktion: Gelingt einer und der zweite nicht,
 Run wiederholen. Der bereits veroeffentlichte bleibt unberuehrt. Keine globale
-Latest-Markierung fuer beide Produkte verwenden. Kuenftige Updater muessen nach
-`client-v` bzw. `server-v` filtern und Entwuerfe/Vorabversionen ausschliessen.
+Latest-Markierung fuer beide Produkte verwenden. Der Client-Updater filtert nach
+`client-v` und schliesst Entwuerfe/Vorabversionen aus. Ein Server-Updater muss
+entsprechend nach `server-v` filtern.
 
 ## Lokale Builds
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File windows-app/build.ps1
 powershell -NoProfile -ExecutionPolicy Bypass -File windows-app/tools/fetch-zxing-source.ps1
+powershell -NoProfile -ExecutionPolicy Bypass -File windows-app/tools/setup-inno.ps1
+powershell -NoProfile -ExecutionPolicy Bypass -File windows-app/build-installer.ps1
 python package-release.py client
-python tools/verify_artifacts.py client artifacts/client/1.4.3
+python tools/verify_artifacts.py client artifacts/client/2.0.0
 
 python package-release.py server
-python tools/verify_artifacts.py server artifacts/server/1.4.3
+python tools/verify_artifacts.py server artifacts/server/2.0.0
+```
+
+Lokaler interaktiver Client-Test ohne Installation:
+
+```powershell
+./windows-app/dist/asn-labeler-test.exe --development
 ```
 
 Pfade an die jeweilige Version anpassen. Server-Pakete benoetigen weder EXE noch
-ZXing-Download. Client-Releases enthalten EXE und vollstaendiges Quellcode-ZIP;
+ZXing-Download. Client-Releases ab 2.0 enthalten Setup-EXE und vollstaendiges Quellcode-ZIP;
 Server-Releases das NAS-ZIP inklusive Service-Quellcode. Beide enthalten
 `release-manifest.json` und `SHA256SUMS.txt`. Die EXE bleibt unsigniert.
 Lokale Manifeste ohne GitHub Actions enthalten keinen bestaetigten CI-Commit.
+GitHub prueft zudem Erstinstallation, erneute Installation, Deinstallation und
+die Sperre bei laufender App, jeweils im Benutzer- und Systemmodus.
+Der Installer-Test darf lokal nur bewusst mit `-AllowLocalInstallationTest`
+gestartet werden; er verweigert vorhandene registrierte Installationen.
 
 ```powershell
 python -m unittest discover -s tools/tests
@@ -97,8 +94,7 @@ python -m unittest discover -s windows-app/tests -p test_release_packaging.py
 
 ## Kompatibilitaet und Updates
 
-Produktversionen sind keine API-Versionen. Server 2.x und Client 1.x koennen
-kompatibel sein. Massgeblich sind `apiVersion`, benoetigte `capabilities` und eine
+Produktversionen sind keine API-Versionen. Massgeblich sind `apiVersion`, benoetigte `capabilities` und eine
 gegebenenfalls ausdruecklich gemeldete `minimumClientVersion` in `/health`.
 Aktuell unterstuetzt der Client API 1 und alte additive Health-Antworten ohne
 API-Feld; unbekannte APIs werden abgewiesen. Sekundaerlabels und sicherer Abgleich
@@ -106,11 +102,34 @@ erfordern passende Faehigkeiten. Produkt-Major-Versionen werden nicht verglichen
 Eine neue inkompatible API braucht eine bewusst implementierte Migration;
 eine neue Produkt-VERSION allein aendert das API-Protokoll nicht.
 
+Ab Server 2.0 wird zusaetzlich mindestens Client 2.0 verlangt. Fuer einen
+Sicherheitsrelease `CLIENT_VERSION_FLOOR` im Service anheben; Administratoren
+koennen mit `MINIMUM_CLIENT_VERSION=X.Y.Z` in `.env` eine strengere Vorgabe
+setzen und den Dienst neu bereitstellen. Die Umgebungsvariable kann den
+Release-Mindeststand nicht absenken. Immer zuerst den benoetigten Client
+veroeffentlichen/installieren, danach die Sperre aktivieren.
+Client-API-Anfragen ohne gueltige oder mit zu alter `X-ASN-Client-Version`
+erhalten HTTP 426. Bestaetigungen bereits gestarteter eigener Auftraege und
+Freigaben nie gestarteter eigener Reservierungen bleiben moeglich. API 1 und
+Datenbankschema 3 bleiben gleich. Admin-Schluessel sind davon ausgenommen,
+solange keine Client-Version angegeben wird; nie in Clients hinterlegen.
+
+Client 2.0 erlaubt produktive API-Zugriffe nur aus seiner registrierten
+Installation. Der lokale Testbuild kann mit `--development` gestartet werden;
+die ausgelieferte EXE enthaelt diese Ausnahme nicht. Das ist kein kryptographischer
+Installationsnachweis: Ein veraenderter Client kann Versionsangaben nachahmen.
+Zugriffsschutz erfolgt weiterhin ueber getrennte API-Schluessel, spaeter Geraetefreigaben.
+
 Adminpanel und Service gehoeren zusammen: Veraltete Adminseiten muessen nach
 Server-Updates neu geladen werden. Das ist keine Client-Versionssperre.
 
-Installationen aktualisieren sich nicht automatisch. Client schliessen und EXE
-ersetzen. NAS: Backup, Druckauftraege beenden, NAS-Paket entpacken, `.env`,
+Ab Client 2.0 einmalig Setup installieren. Danach sucht der Client beim Start
+nach Updates (maximal einmal pro Stunde); manuell unter Einstellungen > Ueber.
+Download und Installation erfordern Bestaetigung. Waehrend Druckauftraegen wird
+kein Update angeboten. Setup startet nach dem Beenden der App und behaelt den
+Installationsmodus sowie Einstellungen/Zugangsdaten. Die Pruefsumme sichert die
+Dateiintegritaet, ersetzt aber keine Codesignatur. Es gibt keine automatische
+Server-Aktualisierung. NAS: Backup, Druckauftraege beenden, NAS-Paket entpacken, `.env`,
 Projektname und Volume behalten; UGREEN-Projekt neu bauen und bereitstellen.
 Danach `/health`, Adminpanel und Client pruefen. Noch kein Docker-Image auf GHCR.
 Migrationen und Kompatibilitaet in Release Notes beachten; Hardwaretests bleiben lokal.

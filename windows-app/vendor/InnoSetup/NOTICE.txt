@@ -1,0 +1,15 @@
+Inno Setup 6.7.0 by Jordan Russell and Martijn Laan
+https://github.com/jrsoftware/issrc/tree/is-6_7_0
+
+Used unmodified to build the Windows installer. The compiler is a build-time
+dependency, not an application runtime. Installer components retain their
+upstream Inno Setup license; original application code remains AGPL-3.0-only.
+See LICENSE.txt in this directory. No commercial license key is bundled.
+
+Compiler installer SHA-256:
+f45c7d68d1e660cf13877ec36738a5179ce72a33414f9959d35e99b68c52a697
+
+Upstream requests commercial users to purchase a license but currently states
+that purchase is not strictly required. Non-commercial users are not requested
+to purchase a license. Recheck https://jrsoftware.org/isorder.php when changing
+the build-tool version or commercial distribution model.

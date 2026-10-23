@@ -49,7 +49,7 @@ class ProductionServerTests(unittest.TestCase):
             try:
                 def reserve(_):
                     req = request.Request(base + "/api/reservations/next", method="POST",
-                                          headers={"Authorization": "Bearer secret"})
+                                          headers={"Authorization": "Bearer secret", "X-ASN-Client-Version": "2.0.0"})
                     with request.urlopen(req, timeout=5) as response:
                         return json.load(response)["asnNumber"]
                 with mock.patch.object(app, "paperless_max_asn", return_value=0), ThreadPoolExecutor(4) as pool:

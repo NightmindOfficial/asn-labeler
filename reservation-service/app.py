@@ -22,6 +22,7 @@ from urllib.parse import urlencode, urlsplit, parse_qs
 
 VERSION = Path(__file__).with_name("VERSION").read_text(encoding="utf-8").strip()
 INSTANCE_ID = uuid.uuid4().hex
+CLIENT_VERSION_FLOOR = "2.0.0"
 RECENT_LOGS = deque(maxlen=300)
 LOG_LOCK = threading.Lock()
 STATIC_DIR = Path(__file__).with_name("web")
@@ -37,12 +38,32 @@ CONFIG = {
     "port": int(os.environ.get("PORT", "8765")),
     "reservation_ttl": int(os.environ.get("RESERVATION_TTL_SECONDS", "300")),
     "printing_settle": int(os.environ.get("PRINTING_SETTLE_SECONDS", "30")),
+    "minimum_client_version": os.environ.get("MINIMUM_CLIENT_VERSION", CLIENT_VERSION_FLOOR),
 }
 STATES = {"reserved", "printing", "printed", "reusable", "blocked"}
 TRANSITIONS = {"printing": {"reserved"}, "printed": {"printing"}, "released": {"reserved"}}
 REQUEST_ID = contextvars.ContextVar("request_id", default="local")
 ACTOR = contextvars.ContextVar("actor", default="local")
 OWNER = contextvars.ContextVar("owner", default="")
+
+
+def version_parts(value):
+    if not isinstance(value, str) or not re.fullmatch(r"(0|[1-9][0-9]{0,4})\.(0|[1-9][0-9]{0,4})\.(0|[1-9][0-9]{0,4})", value):
+        raise ValueError("Invalid client version")
+    parts = tuple(map(int, value.split(".")))
+    if any(part > 65534 for part in parts):
+        raise ValueError("Invalid client version")
+    return parts
+
+
+def minimum_client_version():
+    return max((CLIENT_VERSION_FLOOR, CONFIG["minimum_client_version"]), key=version_parts)
+
+
+def completes_existing_job(method, path):
+    # Finishing an owned job must remain possible after the minimum is raised.
+    return method == "POST" and (path == "/api/documents/copy-labels/printed" or
+        re.fullmatch(r"/api/reservations/[a-zA-Z0-9-]{1,64}/(printed|release)", path) is not None)
 
 
 def now():
@@ -836,6 +857,7 @@ class ApiRequest:
             if path == "/health" and method == "GET":
                 return self.send_json({"ok": True, "version": VERSION, "time": now(),
                     "apiVersion": 1,
+                    "minimumClientVersion": minimum_client_version(),
                     "capabilities": ["safe-sync-v1", "physical-label-confirmation-v1", "secondary-label-tracking-v1"]})
             admin = path.startswith("/api/admin/") and path != "/api/admin/reset-to-paperless"
             if not self.authorized(admin):
@@ -849,6 +871,18 @@ class ApiRequest:
             expected_version = self.headers.get("X-ASN-Version")
             if method == "POST" and expected_version and expected_version != VERSION:
                 return self.send_json({"error": "Service updated. Reload the admin panel.", "errorCode": "admin_reload_required"}, 409)
+            client_version = self.headers.get("X-ASN-Client-Version", "")
+            # Only real admin credentials exempt the web/CLI admin, never a UI header.
+            admin_request = not client_version and self.authorized(admin=True)
+            if not admin_request and not completes_existing_job(method, path):
+                minimum = minimum_client_version()
+                try:
+                    supported = version_parts(client_version) >= version_parts(minimum)
+                except ValueError:
+                    supported = False
+                if not supported:
+                    return self.send_json({"error": "Client update required. Install a supported client version.",
+                        "errorCode": "client_update_required", "minimumClientVersion": minimum}, 426)
             query = parse_qs(parsed.query)
             if method == "GET" and path == "/api/admin/diagnostics":
                 maximum = paperless_max_asn()
@@ -955,6 +989,8 @@ def wsgi_app(environ, start_response):
     headers = {"Authorization": environ.get("HTTP_AUTHORIZATION", ""),
                "X-ASN-Instance": environ.get("HTTP_X_ASN_INSTANCE", ""),
                "X-ASN-Version": environ.get("HTTP_X_ASN_VERSION", ""),
+               "X-ASN-Client-Version": environ.get("HTTP_X_ASN_CLIENT_VERSION", ""),
+               "X-ASN-API-Version": environ.get("HTTP_X_ASN_API_VERSION", "1"),
                "Content-Length": environ.get("CONTENT_LENGTH") or "0",
                "Transfer-Encoding": environ.get("HTTP_TRANSFER_ENCODING", "")}
     path = environ.get("PATH_INFO", "/")
@@ -1021,6 +1057,7 @@ class BoundedServer(ThreadingHTTPServer):
 
 
 def validate_config():
+    version_parts(CONFIG["minimum_client_version"])
     if not CONFIG["api_keys"] or any(not 32 <= len(k) <= 512 or k.startswith("replace-") for k in CONFIG["api_keys"] | CONFIG["admin_keys"]):
         raise RuntimeError("API_KEYS required; each client/admin key must be at least 32 characters")
     if CONFIG["api_keys"] & CONFIG["admin_keys"]:
@@ -1042,6 +1079,7 @@ def main():
     backup_before_migration()
     db_connect().close()
     log("service_started", version=VERSION, schema=3, ttl=CONFIG["reservation_ttl"],
+        minimum_client_version=minimum_client_version(),
         admin_enabled=bool(CONFIG["admin_keys"]), admin_path="/admin/", message="ASN-Service bereit; Paperless wird bei der ersten Abfrage geprueft.")
     serve(wsgi_app, host=CONFIG["listen_addr"], port=CONFIG["port"], threads=8,
           connection_limit=64, backlog=32, channel_timeout=15, cleanup_interval=5,

@@ -4,7 +4,7 @@ import os
 from pathlib import Path, PurePosixPath
 import sys
 from zipfile import ZipFile
-from release_common import read_version, verify_manifest
+from release_common import asset_names, read_version, verify_manifest
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -51,7 +51,7 @@ def verify_server(directory, version):
 
 
 def verify_client(directory, version):
-    if (directory / "asn-labeler.exe").read_bytes()[:2] != b"MZ":
+    if (directory / asset_names(version, "client")[0]).read_bytes()[:2] != b"MZ":
         raise ValueError("Client is not a Windows executable")
     with ZipFile(directory / f"asn-labeler-{version}-source.zip") as archive:
         validate_archive(archive, ["LICENSE", "LICENSE-BPAC-EXCEPTION.txt", "package-release.py",
