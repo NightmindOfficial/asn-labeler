@@ -2,6 +2,9 @@
 
 ## 2.1.0
 
+- Oberflaeche bereinigt: A4-Platzhalter und doppelte Hinweise entfernt; neue
+  Installationen starten ohne vorbelegte Serveradresse. Gespeicherte Adressen bleiben erhalten.
+
 - Optionaler Konsolenclient `asnlbl` mit verwaltetem PATH-Eintrag; Auswahl bleibt bei Updates erhalten.
 - `asnlbl help`, Kurzflags `-c`, `-s`, `-h`, `-v` und separate Anleitung in docs/CLI.md.
 - Einzel- und Seriendruck (1-10), optionaler Einzelschnitt, JSON-Zeilen und eindeutige Exitcodes.

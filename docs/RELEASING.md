@@ -79,7 +79,7 @@ Lokaler interaktiver Client-Test ohne Installation:
 
 Pfade an die jeweilige Version anpassen. Server-Pakete benoetigen weder EXE noch
 ZXing-Download. Client-Releases ab 2.0 enthalten Setup-EXE und vollstaendiges Quellcode-ZIP;
-Server-Releases das NAS-ZIP inklusive Service-Quellcode. Beide enthalten
+Server-Releases das Deployment-ZIP inklusive Service-Quellcode. Beide enthalten
 `release-manifest.json` und `SHA256SUMS.txt`. Die EXE bleibt unsigniert.
 Lokale Manifeste ohne GitHub Actions enthalten keinen bestaetigten CI-Commit.
 GitHub prueft zudem Erstinstallation, erneute Installation, Deinstallation und
@@ -133,7 +133,7 @@ Der Releasejob publiziert es als `ghcr.io/nightmindofficial/asn-reservation:X.Y.
 nach dem veroeffentlichten GitHub-Release folgt der bewegliche Tag `stable`.
 Versions-Tags werden nicht mit anderen Inhalten ueberschrieben.
 Beim ersten Release muss das GHCR-Paket in GitHub unter Package settings auf
-**Public** gestellt werden, damit NAS-Installationen es ohne Zugangsdaten laden.
+**Public** gestellt werden, damit Installationen es ohne Zugangsdaten laden.
 Kein lokaler Test veroeffentlicht Images oder Releases.
 Zugriffsschutz erfolgt weiterhin ueber getrennte API-Schluessel, spaeter Geraetefreigaben.
 
@@ -145,8 +145,22 @@ nach Updates (maximal einmal pro Stunde); manuell unter Einstellungen > Ueber.
 Download und Installation erfordern Bestaetigung. Waehrend Druckauftraegen wird
 kein Update angeboten. Setup startet nach dem Beenden der App und behaelt den
 Installationsmodus sowie Einstellungen/Zugangsdaten. Die Pruefsumme sichert die
-Dateiintegritaet, ersetzt aber keine Codesignatur. Es gibt keine automatische
-Server-Aktualisierung. NAS: Backup, Druckauftraege beenden, NAS-Paket entpacken, `.env`,
-Projektname und Volume behalten; UGREEN-Projekt neu bauen und bereitstellen.
-Danach `/health`, Adminpanel und Client pruefen. Noch kein Docker-Image auf GHCR.
+Dateiintegritaet, ersetzt aber keine Codesignatur. Server-Updates sind standardmaessig
+manuell; ab 2.1 ist das externe Update-Skript ausdruecklich aktivierbar.
+Backup anlegen, Druckauftraege beenden und Image bzw. Deployment-Paket aktualisieren.
+Eigene `.env`, Projektname und Datenvolume behalten; danach `/health`, Adminpanel
+und Client pruefen. Details stehen in der Service-Anleitung.
 Migrationen und Kompatibilitaet in Release Notes beachten; Hardwaretests bleiben lokal.
+
+## Konfiguration bei jedem Update
+
+Jeder Release und jede Uebergabe benennt ausdruecklich, ob sich `.env` aendert.
+Bei Aenderungen: betroffene Variablen, alte/neue Defaults, erforderliche Schritte
+und Abwaertskompatibilitaet nennen. Auch geaenderte Bedeutung unveraenderter
+Variablennamen zaehlt. Ohne Aenderung: `.env: unveraendert`.
+
+**Service 2.1.0:** `MINIMUM_CLIENT_VERSION` entfaellt aus `.env.example` und wird
+nicht mehr ausgewertet. Ein vorhandener Eintrag kann entfernt werden; die
+Mindestversion ist jetzt im Server-Release eingebettet. Wer bisher einen hoeheren
+eigenen Mindeststand gesetzt hat, verliert diese Ueberschreibung und muss die
+Release-Vorgabe vor dem Update pruefen. Sonstige Werte und Secrets beibehalten.

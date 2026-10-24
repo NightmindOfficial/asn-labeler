@@ -338,12 +338,8 @@
   "Die neue Sprache wird nach dem Schließen dieses Fensters angewendet.": "The new language takes effect after you close this window.",
   "Sekundärlabel": "Secondary label",
   "Über": "About",
-  "Stellvertreterkarte (A4)": "Placeholder sheet (A4)",
-  "Coming Soon": "Coming soon",
-  "Stellvertreterkarte drucken": "Print placeholder sheet",
   "ASN-Labels und Stellvertreterlabels für paperless-ngx mit Brother QL-800.": "ASN and secondary labels for paperless-ngx with Brother QL-800.",
   "Autor: nightmind.dev": "Author: nightmind.dev",
   "Link konnte nicht geöffnet werden": "Could not open link",
-  "AGPLv3 mit zusätzlicher b-PAC-Erlaubnis. Ohne Gewährleistung.": "AGPLv3 with additional b-PAC permission. No warranty.",
-  "Brother b-PAC und Druckertreiber werden separat installiert. Windows-Schriften werden nicht mitgeliefert.": "Brother b-PAC and printer drivers are installed separately. Windows fonts are not bundled."
+  "AGPLv3 mit zusätzlicher b-PAC-Erlaubnis. Ohne Gewährleistung.": "AGPLv3 with additional b-PAC permission. No warranty."
 }

@@ -10,11 +10,11 @@ Ein unbekannter Stand oder GitHub-Ausfall erzeugt keine Sperre; eine bereits
 bekannte Sperre bleibt jedoch auch nach Neustart und Netzausfall erhalten.
 
 Fuer fertige Docker-Images die `docker-compose.registry.yml` im **bestehenden**
-NAS-Projekt verwenden. Projektname, `.env`, Datenvolume und Netz bleiben gleich.
+Compose-Projekt verwenden. Projektname, `.env`, Datenvolume und Netz bleiben gleich.
 Der Standardtag `stable` folgt stabilen Server-Releases. Beim ersten GHCR-Release
 muss der Herausgeber das Paket einmal auf Public stellen. Plattform: linux/amd64.
 
-Optionale automatische Installation auf dem NAS (nicht im Service-Container):
+Optionale automatische Installation auf dem Docker-Host (nicht im Service-Container):
 
 ```sh
 # Nur pruefen und Image herunterladen, noch nicht installieren:
@@ -23,8 +23,8 @@ sh update-server.sh DEIN_BISHERIGER_COMPOSE_PROJEKTNAME
 sh update-server.sh DEIN_BISHERIGER_COMPOSE_PROJEKTNAME --apply
 ```
 
-Voraussetzungen: Docker Compose v2 und `flock` auf dem NAS, Service mindestens
-2.1 installiert. Im NAS-Aufgabenplaner kann der zweite Befehl regelmaessig laufen;
+Voraussetzungen: Docker Compose v2 und `flock` auf dem Host, Service mindestens
+2.1 installiert. In einem Aufgabenplaner (z. B. cron) kann der zweite Befehl regelmaessig laufen;
 ohne diese eigene Aktivierung gibt es keine automatische Installation.
 Den echten Projektnamen aus der Docker-UI uebernehmen, keinen neuen erfinden.
 Das Skript verweigert unbekannte Projekte und Downgrades, pinnt den geladenen
@@ -36,7 +36,7 @@ keinen Docker-Socket. Bei Fehlern Logs pruefen, niemals automatisch eine alte
 Datenbank zurueckspielen: Zwischenzeitliche Labels koennten sonst doppelt werden.
 
 Bei einem unbestaetigten Sekundaerlabel, das nicht mehr aufgeloest werden kann,
-Clients und Drucker manuell stoppen und das Update ueber die NAS-UI durchfuehren.
+Clients und Drucker manuell stoppen und das Update ueber Docker Compose durchfuehren.
 Dabei die Datenbank behalten. Das automatische Skript umgeht diese Sperre nicht.
 
 Der Dienst koordiniert ASN-Nummern fuer eine Paperless-Instanz. SQLite speichert
@@ -54,7 +54,7 @@ Die Mindest-Clientversion ist ab 2.1 ausschliesslich im Server-Release festgeleg
 Eine alte `MINIMUM_CLIENT_VERSION`-Variable wird ignoriert. Es wird nicht pauschal
 die neueste GitHub-Version erzwungen.
 
-- Docker mit Compose, etwa die Docker-Projektverwaltung eines NAS.
+- Docker mit Compose auf einem Linux-Host, einer VM, einem Cloudserver oder NAS.
 - Eine erreichbare paperless-ngx-Instanz und ein API-Token mit Leserechten auf
   alle Dokumente des verwendeten ASN-Nummernkreises.
 - Einen eigenen langen Client-Schluessel und einen davon verschiedenen
@@ -62,7 +62,7 @@ die neueste GitHub-Version erzwungen.
 
 ## Einrichtung
 
-1. Dieses Service-Verzeichnis oder das vollstaendige NAS-Releasepaket in einen
+1. Dieses Service-Verzeichnis oder das vollstaendige Server-Releasepaket in einen
    dauerhaften Projektordner kopieren. `web/`, `licenses/`, `tests/` und alle
    Build-Dateien werden benoetigt. Keine Verzeichnisse auf `/opt/asn` mounten.
 2. `.env.example` als `.env` kopieren und die Platzhalter ersetzen:
@@ -80,10 +80,10 @@ die neueste GitHub-Version erzwungen.
    | `SQLITE_PATH` | Datenbank im persistenten Volume, Standard `/data/reservations.sqlite3` |
    | `NAS_BIND_IP` | Hostadresse fuer Port 8765; Standard `127.0.0.1` |
 
-   `localhost` in `PAPERLESS_URL` bezeichnet den Service-Container, nicht das NAS
+   `localhost` in `PAPERLESS_URL` bezeichnet den Service-Container, nicht den Host
    oder einen anderen Container. Zufallsschluessel separat erzeugen, beispielsweise
    mit `python -c "import secrets; print(secrets.token_urlsafe(32))"`.
-3. In der NAS-Oberflaeche ein Compose-Projekt mit der mitgelieferten Datei anlegen
+3. In der Docker-Projektverwaltung ein Compose-Projekt mit der mitgelieferten Datei anlegen
    und bauen/starten. Alternativ im Service-Ordner:
 
    ```sh
@@ -102,8 +102,11 @@ Update nicht versehentlich gewechselt werden.
 
 ## Netzwerk und Zugriff
 
+`NAS_BIND_IP` und `*-nas.zip` sind historische Namen und bleiben kompatibel.
+Sie setzen kein NAS voraus. Der Dienst kann auf jedem passenden Docker-Host laufen.
+
 Die Voreinstellung bindet Port 8765 nur lokal am Host. Fuer direkten LAN-Zugriff
-`NAS_BIND_IP` auf die konkrete LAN-IP des NAS setzen; der direkte Port bietet
+`NAS_BIND_IP` auf die konkrete LAN-IP des Hosts setzen; der direkte Port bietet
 selbst kein TLS. Fuer oeffentlichen Zugriff einen HTTPS-Reverse-Proxy verwenden.
 
 Ein Cloudflare-Tunnel kann intern an `http://asn-reservation:8765` weiterleiten,
@@ -154,7 +157,7 @@ nicht in Fehlerberichte kopieren. Bei Paperless-Verbindungsfehlern URL, Token,
 Dokumentrechte und Erreichbarkeit aus dem Container pruefen.
 
 Ein Fehler mit `/app/app.py` deutet auf einen alten Startbefehl hin: Das aktuelle
-Image startet `/opt/asn/app.py`. NAS-Command-Overrides und alte Images pruefen.
+Image startet `/opt/asn/app.py`. Command-Overrides und alte Images pruefen.
 Bei Schreibfehlern auf `/data` Volume und Rechte kontrollieren; nicht pauschal
 Root-Betrieb oder `chmod 777` aktivieren.
 

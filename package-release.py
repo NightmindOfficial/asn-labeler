@@ -18,7 +18,7 @@ sys.path.insert(0, str(ROOT / "tools"))
 from release_common import asset_names, read_version, write_manifest, version_tuple
 SERVICE = ROOT / "reservation-service"
 PUBLIC_DOCUMENTS = (
-    "README.md", "CHANGELOG.md", "THIRD-PARTY-NOTICES.md",
+    "README.md", "CONTRIBUTING.md", "SECURITY.md", "CHANGELOG.md", "THIRD-PARTY-NOTICES.md",
     "docs/USAGE.md", "docs/CLI.md", "docs/RELEASING.md",
     "windows-app/CHANGELOG.md",
 )
@@ -39,6 +39,7 @@ def client_source_files(root):
                      and path.suffix not in (".pyc", ".download"))
     files.extend((root / "tools").rglob("*.py"))
     files.extend((root / "tools").rglob("*.cjs"))
+    files.extend((root / "docs" / "images").glob("*.png"))
     return sorted(files)
 
 

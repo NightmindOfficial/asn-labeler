@@ -22,7 +22,8 @@ const root = path.resolve(__dirname, '../../reservation-service/web');
         }
         if (url.pathname.startsWith('/api/')) {
           if (offline) return route.abort();
-          return route.fulfill({json:{version:'2.1.0',paperlessHighWater:1,paperlessMax:1,total:0,items:[]},headers:{'X-ASN-Version':serverVersion}});
+          const items = url.pathname === '/api/documents/status' ? [{barcodeText:'ASN00002',status:'pending',documentTitle:'Beispieldokument',reservationId:'example',updatedAt:1792800000}] : [];
+          return route.fulfill({json:{version:'2.1.0',paperlessHighWater:1,paperlessMax:1,total:1,items},headers:{'X-ASN-Version':serverVersion}});
         }
         const file = path.join(root,url.pathname === '/admin/' ? 'index.html' : path.basename(url.pathname));
         const type = {'.js':'text/javascript','.css':'text/css','.html':'text/html','.ico':'image/x-icon','.ttf':'font/ttf'}[path.extname(file)];
@@ -40,6 +41,7 @@ const root = path.resolve(__dirname, '../../reservation-service/web');
       const footer = await page.locator('footer').boundingBox();
       assert(Math.abs(footer.y + footer.height - size.height) <= 1);
       assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
+      await page.screenshot({path:path.resolve('artifacts/admin-ready-'+size.width+'.png')});
       offline = true;
       await page.locator('#refresh').click();
       await page.locator('#connectionDialog').waitFor({state:'visible'});
