@@ -7,9 +7,9 @@
 DataMatrix labels for **paperless-ngx**, with a Windows client and a self-hosted reservation service.
 
 [![CI](https://github.com/NightmindOfficial/asn-labeler/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/NightmindOfficial/asn-labeler/actions/workflows/ci.yml)
-[![License: AGPL v3](https://img.shields.io/badge/license-AGPL_v3-176b53)](LICENSE)
+[![License: AGPL v3](https://img.shields.io/badge/license-AGPL_v3-176b53?logo=data:image/svg%2Bxml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSJ3aGl0ZSIgc3Ryb2tlLXdpZHRoPSIxLjgiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCI%2BPHBhdGggZD0iTTEyIDN2MThNNyAyMWgxME0zIDdoMThNNiA3bC00IDloOEw2IDdabTEyIDAtNCA5aDhsLTQtOVoiLz48L3N2Zz4%3D)](LICENSE)
 [![Windows x64](https://img.shields.io/badge/client-Windows_x64-0078D4)](#get-started)
-[![Docker](https://img.shields.io/badge/server-self--hosted_Docker-2496ED)](reservation-service/README.md)
+[![Docker](https://img.shields.io/badge/server-self--hosted_Docker-2496ED?logo=docker&logoColor=white)](reservation-service/README.md)
 
 [**Downloads**](https://github.com/NightmindOfficial/asn-labeler/releases) · [**Get started**](#get-started) · [**Documentation**](#documentation) · [**Issues**](https://github.com/NightmindOfficial/asn-labeler/issues)
 
