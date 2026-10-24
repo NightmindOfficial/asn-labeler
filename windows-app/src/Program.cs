@@ -187,6 +187,9 @@ namespace AsnLabeler
             ClientRuntime.DevelopmentMode = args.Contains("--development") || args.Contains("--self-test");
 #endif
             ServicePointManager.SecurityProtocol |= SecurityProtocolType.Tls12;
+#if CLI
+            return HeadlessCli.Run(args);
+#else
             if (args.Length > 0 && args[0] == "--apply-update") return ClientUpdates.Apply(args);
             if (args.Length == 1 && args[0] == "--licenses")
             {
@@ -266,6 +269,7 @@ namespace AsnLabeler
                 do { Loc.Language = AppConfig.Load().Language; using (var form = new MainForm()) { Application.Run(form); restart = form.RestartRequested; } } while (restart);
             }
             return 0;
+#endif
         }
     }
 

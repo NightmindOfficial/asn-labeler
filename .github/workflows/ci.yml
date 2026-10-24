@@ -95,6 +95,14 @@ jobs:
         run: |
           ./windows-app/dist/asn-labeler-test.exe --self-test
           if ($LASTEXITCODE -ne 0) { throw 'Client self-tests failed' }
+      - name: Admin browser tests (simulated service only)
+        run: |
+          npm install --prefix .local/admin-tests --ignore-scripts --no-audit --no-fund playwright@1.62.1
+          if ($LASTEXITCODE -ne 0) { throw 'Browser test dependency installation failed' }
+          $env:PLAYWRIGHT_MODULE = (Resolve-Path .local/admin-tests/node_modules/playwright).Path
+          $env:BROWSER_CHANNEL = 'msedge'
+          node tools/tests/admin_ui.cjs
+          if ($LASTEXITCODE -ne 0) { throw 'Admin browser tests failed' }
       - name: Fetch verified third-party source
         if: needs.metadata.outputs.client_release == 'true'
         run: ./windows-app/tools/fetch-zxing-source.ps1
@@ -128,6 +136,7 @@ jobs:
 
   docker:
     name: Docker build and smoke test
+    needs: metadata
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
@@ -137,8 +146,20 @@ jobs:
       - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
         with:
           python-version: '3.12'
-      - run: docker build --tag asn-reservation:ci reservation-service
+      - name: Build release image
+        env:
+          SERVER_VERSION: ${{ needs.metadata.outputs.server_version }}
+        run: docker build --tag asn-reservation:ci --label "org.opencontainers.image.version=$SERVER_VERSION" --label "org.opencontainers.image.revision=$GITHUB_SHA" reservation-service
       - run: python tools/docker_smoke.py
+      - run: docker save -o server-image.tar asn-reservation:ci
+        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main' && needs.metadata.outputs.server_release == 'true'
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main' && needs.metadata.outputs.server_release == 'true'
+        with:
+          name: tested-server-image
+          path: server-image.tar
+          if-no-files-found: error
+          retention-days: 7
 
   gate:
     name: CI gate
@@ -161,6 +182,7 @@ jobs:
     timeout-minutes: 20
     permissions:
       contents: write
+      packages: write
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
@@ -183,8 +205,27 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: python tools/publish_release.py client artifacts/client
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        if: needs.metadata.outputs.server_release == 'true'
+        with:
+          name: tested-server-image
+          path: docker-image/
+      - name: Publish tested Docker image
+        if: needs.metadata.outputs.server_release == 'true'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          docker load -i docker-image/server-image.tar
+          printf '%s' "$GITHUB_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+          python tools/publish_image.py version
       - name: Publish server (existing published releases remain untouched)
         if: needs.metadata.outputs.server_release == 'true'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: python tools/publish_release.py server artifacts/server
+      - name: Promote published server to stable
+        if: needs.metadata.outputs.server_release == 'true'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          python tools/publish_image.py stable

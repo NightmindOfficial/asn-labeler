@@ -5,7 +5,8 @@ from pathlib import Path
 import secrets
 import subprocess
 import time
-from urllib.request import urlopen
+from urllib.request import urlopen, Request
+from urllib.error import HTTPError
 from zipfile import ZipFile
 from release_common import read_version
 
@@ -17,13 +18,14 @@ def docker(*args, **kwargs):
 def main():
     suffix = secrets.token_hex(6)
     name, volume = "asn-ci-" + suffix, "asn-ci-data-" + suffix
+    client_key = secrets.token_urlsafe(32)
     try:
         docker("volume", "create", volume)
         docker("run", "--detach", "--name", name, "--read-only", "--cap-drop", "ALL",
                "--security-opt", "no-new-privileges:true", "--tmpfs", "/tmp:size=16m,mode=1777",
                "--mount", f"type=volume,source={volume},target=/data", "--publish", "127.0.0.1::8765",
                "--env", "PAPERLESS_URL=http://paperless.invalid", "--env", "PAPERLESS_TOKEN=ci-test-only",
-               "--env", "API_KEYS=" + secrets.token_urlsafe(32),
+               "--env", "API_KEYS=" + client_key,
                "--env", "ADMIN_API_KEYS=" + secrets.token_urlsafe(32), "asn-reservation:ci")
         address = docker("port", name, "8765/tcp").splitlines()[0]
         base = "http://" + address
@@ -50,6 +52,20 @@ def main():
                 if source.read("VERSION").decode().strip() != version:
                     raise ValueError("Container source archive version mismatch")
         docker("exec", name, "python", "-c", "import sqlite3; c=sqlite3.connect('/data/reservations.sqlite3'); assert c.execute('PRAGMA user_version').fetchone()[0] == 3")
+        target = str(int(version.split('.')[0]) + 1) + ".0.0"
+        prepared = json.loads(docker("exec", name, "python", "maintenance.py", "prepare", "--target", target, "--lease", "1"))
+        if not prepared.get("ready"):
+            raise ValueError("Update preparation failed")
+        req = Request(base + "/api/reservations/next", data=b"{}", headers={
+            "Authorization": "Bearer " + client_key, "X-ASN-Client-Version": health["minimumClientVersion"],
+            "Content-Type": "application/json", "X-ASN-API-Version": "1"})
+        try:
+            urlopen(req, timeout=5).close()
+            raise ValueError("Maintenance permitted a reservation")
+        except HTTPError as error:
+            if error.code != 503 or json.load(error).get("errorCode") not in ("service_maintenance", "server_update_required"):
+                raise
+        docker("exec", name, "python", "maintenance.py", "resume", "--lease", "1")
         print("Container health, database, permissions, admin UI and source download passed.")
     except Exception:
         subprocess.run(["docker", "logs", name], check=False)

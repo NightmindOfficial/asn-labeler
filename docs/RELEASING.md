@@ -103,10 +103,9 @@ Eine neue inkompatible API braucht eine bewusst implementierte Migration;
 eine neue Produkt-VERSION allein aendert das API-Protokoll nicht.
 
 Ab Server 2.0 wird zusaetzlich mindestens Client 2.0 verlangt. Fuer einen
-Sicherheitsrelease `CLIENT_VERSION_FLOOR` im Service anheben; Administratoren
-koennen mit `MINIMUM_CLIENT_VERSION=X.Y.Z` in `.env` eine strengere Vorgabe
-setzen und den Dienst neu bereitstellen. Die Umgebungsvariable kann den
-Release-Mindeststand nicht absenken. Immer zuerst den benoetigten Client
+Sicherheitsrelease `CLIENT_VERSION_FLOOR` im Service anheben. Seit 2.1 ist
+dies die einzige Vorgabe; `MINIMUM_CLIENT_VERSION` in `.env` wird ignoriert.
+Immer zuerst den benoetigten Client
 veroeffentlichen/installieren, danach die Sperre aktivieren.
 Client-API-Anfragen ohne gueltige oder mit zu alter `X-ASN-Client-Version`
 erhalten HTTP 426. Bestaetigungen bereits gestarteter eigener Auftraege und
@@ -118,6 +117,24 @@ Client 2.0 erlaubt produktive API-Zugriffe nur aus seiner registrierten
 Installation. Der lokale Testbuild kann mit `--development` gestartet werden;
 die ausgelieferte EXE enthaelt diese Ausnahme nicht. Das ist kein kryptographischer
 Installationsnachweis: Ein veraenderter Client kann Versionsangaben nachahmen.
+
+## Server-Images und Sicherheitsrichtlinie ab 2.1
+
+`reservation-service/release-policy.json` muss dieselbe Version wie die
+Server-VERSION enthalten. `minimumSafeServerVersion` nur bei begruendetem
+Sicherheitsbedarf anheben; ein normaler Release erfordert keine Sperre aelterer
+Versionen. Die Datei wird als `server-update-policy.json` mitveroeffentlicht.
+Server ab 2.1 fragen diese offizielle Richtlinie stuendlich ab und speichern
+den hoechsten jemals bekannten Mindeststand dauerhaft. Eine fehlerhafte Anhebung
+kann deshalb nicht durch Senken der naechsten Richtlinie rueckgaengig werden.
+
+CI speichert nach dem Docker-Smoke-Test genau das getestete linux/amd64-Image.
+Der Releasejob publiziert es als `ghcr.io/nightmindofficial/asn-reservation:X.Y.Z`;
+nach dem veroeffentlichten GitHub-Release folgt der bewegliche Tag `stable`.
+Versions-Tags werden nicht mit anderen Inhalten ueberschrieben.
+Beim ersten Release muss das GHCR-Paket in GitHub unter Package settings auf
+**Public** gestellt werden, damit NAS-Installationen es ohne Zugangsdaten laden.
+Kein lokaler Test veroeffentlicht Images oder Releases.
 Zugriffsschutz erfolgt weiterhin ueber getrennte API-Schluessel, spaeter Geraetefreigaben.
 
 Adminpanel und Service gehoeren zusammen: Veraltete Adminseiten muessen nach

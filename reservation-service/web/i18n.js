@@ -1,6 +1,11 @@
 "use strict";
 window.ASNLocale = (() => {
   const en = {
+    "Verbindungsversuche nach zwei Minuten beendet. Bitte lade die Seite neu.":"Connection attempts stopped after two minutes. Please reload the page.",
+    "Sicherheitsupdate erforderlich. Neue Druckaufträge sind gesperrt.":"Security update required. New print jobs are blocked.",
+    "Server-Update verfügbar.":"Server update available.",
+    "Sicherheitsstand derzeit nicht prüfbar. Keine neue Sperre aktiviert.":"Security status cannot currently be checked. No new block has been activated.",
+    "Release öffnen":"View release",
     "Quellcode":"Source code", "Drittanbieter":"Third-party notices", "Ohne Gewährleistung":"No warranty",
     "Zu diesem Dokument wurden {0} Sekundärlabels erstellt.":"{0} secondary labels have been created for this document.",
     "copy_prepared":"Secondary label prepared", "copy_printed":"Secondary label printed",

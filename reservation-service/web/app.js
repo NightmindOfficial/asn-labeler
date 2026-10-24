@@ -2,6 +2,7 @@
 (() => {
   const $ = id => document.getElementById(id);
   const T = ASNLocale.t;
+  new ResizeObserver(entries => document.documentElement.style.setProperty("--footer-height", entries[0].target.getBoundingClientRect().height + "px")).observe(document.querySelector("footer"));
   $("language").onchange = () => {
     ASNLocale.apply($("language").value);
     notice("");
@@ -9,6 +10,14 @@
   };
   const version = document.querySelector('meta[name="asn-version"]').content;
   let disconnected = false, updateRequired = false, retryAt = 0, reconnecting = false;
+  let retryDeadline = 0, retryStopped = false, retryController = null;
+  function stopRetries() {
+    retryStopped = true;
+    retryController?.abort();
+    $("connectionSpinner").hidden = true;
+    $("reloadConnection").hidden = false;
+    $("retryCountdown").textContent = T("Verbindungsversuche nach zwei Minuten beendet. Bitte lade die Seite neu.");
+  }
   const connectionError = () => Object.assign(new Error(T("Server nicht erreichbar.")), {connection:true});
   function requireUpdate() {
     updateRequired = true;
@@ -23,6 +32,8 @@
   function offline() {
     if (!updateRequired && !disconnected) {
       disconnected = true; retryAt = performance.now() + 10000;
+      retryDeadline = performance.now() + 120000; retryStopped = false;
+      $("connectionSpinner").hidden = false; $("reloadConnection").hidden = true;
       $("retryCountdown").textContent = T("Erneuter Verbindungsversuch in 10 Sekunden");
       $("reconnected").hidden = true;
       $("connectionDialog").showModal();
@@ -31,6 +42,7 @@
   }
   $("connectionDialog").oncancel = $("updateDialog").oncancel = event => event.preventDefault();
   $("reloadApp").onclick = () => location.reload();
+  $("reloadConnection").onclick = () => location.reload();
   const names = {reserved:"Reserviert",printing:"Druck gestartet",in_print:"In Druck",printed:"Gedruckt",reusable:"Wiederverwendbar",blocked:"Gesperrt",pending:"Scan ausstehend",uncertain:"Druck unklar",imported:"In Paperless",unused:"Nicht gedruckt"};
   const completedPreference = "asn-admin.hideCompleted";
   try {
@@ -135,7 +147,18 @@
   }
   function status(value) { const span = document.createElement("span"); span.className = "status " + (Object.hasOwn(names,value) ? value : ""); span.textContent = T(names[value] || value); return span; }
   function headers(labels) { $("head").replaceChildren(); const tr=document.createElement("tr"); labels.forEach(label=>{const th=document.createElement("th"); th.scope="col"; th.textContent=label; tr.append(th);}); $("head").append(tr); }
-  async function summary() { const data = await api("/api/admin/state"); $("version").textContent = "Service " + data.version; $("footerVersion").textContent = data.version; $("maximum").textContent = data.paperlessHighWater; $("total").textContent = data.total; }
+  function showServerUpdate(info) {
+    const node = $("serverUpdateNotice"); node.replaceChildren();
+    node.hidden = !info || (!info.blocked && !info.updateAvailable && !info.checkFailed && info.state !== "unknown");
+    if (node.hidden) return;
+    node.className = info.blocked ? "error" : "";
+    node.append(document.createTextNode(T(info.blocked ? "Sicherheitsupdate erforderlich. Neue Druckaufträge sind gesperrt." : info.updateAvailable ? "Server-Update verfügbar." : "Sicherheitsstand derzeit nicht prüfbar. Keine neue Sperre aktiviert.")));
+    if (info.latestVersion) node.append(document.createTextNode(" " + info.currentVersion + " → " + info.latestVersion + " "));
+    if (info.releaseUrl?.startsWith("https://github.com/NightmindOfficial/asn-labeler/releases/tag/server-v")) {
+      const link = document.createElement("a"); link.href = info.releaseUrl; link.textContent = T("Release öffnen"); link.target = "_blank"; link.rel = "noopener noreferrer"; node.append(link);
+    }
+  }
+  async function summary() { const data = await api("/api/admin/state"); $("version").textContent = "Service " + data.version; $("footerVersion").textContent = data.version; $("maximum").textContent = data.paperlessHighWater; $("total").textContent = data.total; showServerUpdate(data.serverUpdate); }
   let lastView = "";
   async function load(more = false) {
     // Fetch before replacing rows, so background refresh never blanks the table.
@@ -257,22 +280,27 @@
   setInterval(async () => {
     if (updateRequired) return;
     if (disconnected) {
+      if (retryStopped) return;
+      if (performance.now() >= retryDeadline) { stopRetries(); return; }
       const remaining = Math.max(0, Math.ceil((retryAt - performance.now()) / 1000));
       $("retryCountdown").textContent = reconnecting ? T("Verbindung wird geprüft…") : T("Erneuter Verbindungsversuch in ") + remaining + T(" Sekunden");
       if (remaining || reconnecting) return;
       reconnecting = true;
-      const controller = new AbortController(), timeout = setTimeout(() => controller.abort(), 8000);
+      const controller = new AbortController(), timeout = setTimeout(() => controller.abort(), Math.min(8000, retryDeadline - performance.now()));
+      retryController = controller;
       try {
         const response = await fetch("/health", {cache:"no-store",credentials:"omit",redirect:"error",signal:controller.signal});
+        if (retryStopped || performance.now() >= retryDeadline) { stopRetries(); return; }
         checkVersion(response);
         const health = await response.json();
+        if (retryStopped || performance.now() >= retryDeadline) { stopRetries(); return; }
         if (!response.ok || health.ok !== true || !response.headers.get("X-ASN-Version")) throw new Error();
         disconnected = false; $("connectionDialog").close();
         $("reconnected").hidden = false;
         setTimeout(() => { $("reconnected").hidden = true; }, 2500);
         if (key && !$("workspace").hidden) await run(async () => { await summary(); await load(); });
       } catch (_) { /* Retry reads only; never replay a mutation. */ }
-      finally { clearTimeout(timeout); reconnecting = false; retryAt = performance.now() + 10000; }
+      finally { clearTimeout(timeout); retryController = null; reconnecting = false; retryAt = performance.now() + 10000; }
       return;
     }
     $("refreshCountdown").hidden = !key;

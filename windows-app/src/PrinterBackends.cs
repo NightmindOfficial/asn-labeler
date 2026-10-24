@@ -837,6 +837,39 @@ namespace AsnLabeler
         public static IEnumerable<string> Run()
         {
             var failures = new List<string>();
+            int cliCount; bool cliCut;
+            foreach (var invalidArgs in new[] { new[] { "print", "--count", "0" }, new[] { "print", "--count", "11" },
+                new[] { "print", "--count" }, new[] { "print", "--unknown" }, new[] { "print", "--cut-each", "--cut-each" } })
+                if (HeadlessCli.Parse(invalidArgs, out cliCount, out cliCut)) failures.Add("CLI accepted invalid arguments.");
+            if (!HeadlessCli.Parse(new[] { "print", "--count", "10", "--cut-each" }, out cliCount, out cliCut) || cliCount != 10 || !cliCut)
+                failures.Add("CLI argument parsing failed.");
+            if (!HeadlessCli.Parse(new[] { "print", "-c", "3", "-s" }, out cliCount, out cliCut) || cliCount != 3 || !cliCut)
+                failures.Add("CLI short flags failed.");
+            foreach (var invalidArgs in new[] { new[] { "print", "-c", "0" }, new[] { "print", "-c" },
+                new[] { "print", "-s", "--cut-each" }, new[] { "print", "-c", "2", "--count", "3" } })
+                if (HeadlessCli.Parse(invalidArgs, out cliCount, out cliCut)) failures.Add("CLI accepted duplicate/invalid short flags.");
+            foreach (string scenario in new[] { "success", "preflight", "reserve", "prepare", "handshake", "send", "ack" })
+            {
+                int allocated = 0, acknowledged = 0, released = 0;
+                var cuts = new List<bool>();
+                var printer = new FakePrinter { Send = before => {
+                    if (scenario == "prepare") throw new InvalidOperationException();
+                    before();
+                    if (scenario == "send") throw new TimeoutException();
+                } };
+                var output = new StringWriter(); var errors = new StringWriter();
+                int result = HeadlessCli.Print(2, false, new AppConfig(), () => printer,
+                    () => { if (scenario == "preflight") throw new TimeoutException(); return new Reservation { barcodeText = "ASN00001" }; },
+                    () => { if (scenario == "reserve") throw new TimeoutException(); allocated++; return new Reservation { reservationId = "test", barcodeText = "ASN00001" }; },
+                    id => { if (scenario == "handshake") throw new TimeoutException(); },
+                    id => { if (scenario == "ack") throw new TimeoutException(); acknowledged++; cuts.Add(printer.CutAfter); },
+                    id => released++, output, errors);
+                int expected = scenario == "success" ? 0 : new[] { "handshake", "send", "ack" }.Contains(scenario) ? 5 : 4;
+                if (result != expected) failures.Add("CLI exit code: " + scenario);
+                if (released != (scenario == "prepare" ? 1 : 0)) failures.Add("CLI unsafe release: " + scenario);
+                if (allocated > (scenario == "success" ? 2 : 1)) failures.Add("CLI continued after failure.");
+                if (scenario == "success" && (acknowledged != 2 || !cuts.SequenceEqual(new[] { false, true }))) failures.Add("CLI batch/cut policy failed.");
+            }
             foreach (int invalid in new[] { 0, 11 })
             {
                 try { new PrintBatch(invalid); failures.Add("Invalid batch quantity accepted."); }

@@ -1,5 +1,44 @@
 # Reservation-Service
 
+## Updates ab 2.1
+
+Standardmaessig gibt es nur Hinweise im Adminpanel. Stuendlich wird ohne
+API-Schluessel oder Dokumentdaten die offizielle GitHub-Release-Richtlinie gelesen.
+Nur nachweislich unsichere Versionen sperren neue Reservierungen, Druckstarts und
+Sekundaerlabel-Starts. Bestaetigungen und sichere Freigaben bleiben moeglich.
+Ein unbekannter Stand oder GitHub-Ausfall erzeugt keine Sperre; eine bereits
+bekannte Sperre bleibt jedoch auch nach Neustart und Netzausfall erhalten.
+
+Fuer fertige Docker-Images die `docker-compose.registry.yml` im **bestehenden**
+NAS-Projekt verwenden. Projektname, `.env`, Datenvolume und Netz bleiben gleich.
+Der Standardtag `stable` folgt stabilen Server-Releases. Beim ersten GHCR-Release
+muss der Herausgeber das Paket einmal auf Public stellen. Plattform: linux/amd64.
+
+Optionale automatische Installation auf dem NAS (nicht im Service-Container):
+
+```sh
+# Nur pruefen und Image herunterladen, noch nicht installieren:
+sh update-server.sh DEIN_BISHERIGER_COMPOSE_PROJEKTNAME
+# Ausdruecklich installieren:
+sh update-server.sh DEIN_BISHERIGER_COMPOSE_PROJEKTNAME --apply
+```
+
+Voraussetzungen: Docker Compose v2 und `flock` auf dem NAS, Service mindestens
+2.1 installiert. Im NAS-Aufgabenplaner kann der zweite Befehl regelmaessig laufen;
+ohne diese eigene Aktivierung gibt es keine automatische Installation.
+Den echten Projektnamen aus der Docker-UI uebernehmen, keinen neuen erfinden.
+Das Skript verweigert unbekannte Projekte und Downgrades, pinnt den geladenen
+Image-Digest und setzt vor dem Austausch eine 30-minuetige Wartungssperre.
+Unbestaetigte Drucke (auch unklare) oder Sekundaerlabels verschieben das Update.
+Vor dem Austausch liegt ein SQLite-Backup unter `/data/backups`. Backups nach
+Bedarf archivieren; sie werden nicht automatisch geloescht. Der Service bekommt
+keinen Docker-Socket. Bei Fehlern Logs pruefen, niemals automatisch eine alte
+Datenbank zurueckspielen: Zwischenzeitliche Labels koennten sonst doppelt werden.
+
+Bei einem unbestaetigten Sekundaerlabel, das nicht mehr aufgeloest werden kann,
+Clients und Drucker manuell stoppen und das Update ueber die NAS-UI durchfuehren.
+Dabei die Datenbank behalten. Das automatische Skript umgeht diese Sperre nicht.
+
 Der Dienst koordiniert ASN-Nummern fuer eine Paperless-Instanz. SQLite speichert
 Reservierungen, Druckzustaende, Sekundaerlabel-Auftraege und den Aenderungsverlauf.
 Das Adminpanel ist unter `/admin/` erreichbar. Version und API-Faehigkeiten liefert
@@ -11,10 +50,9 @@ Ab Service 2.0 wird Client 2.0 oder neuer benoetigt. Zuerst den Client per Setup
 installieren, dann den Service aktualisieren. Die Versionssperre gilt fuer neue
 Clientaktionen; bestehende eigene Druckauftraege duerfen noch bestaetigt werden.
 Adminpanel und administrative Werkzeuge bleiben mit separatem Admin-Key erreichbar.
-`MINIMUM_CLIENT_VERSION` kann fuer Sicherheitsupdates angehoben werden; nach
-Aenderung den Dienst neu bereitstellen. Der im Release eingebaute Mindeststand
-kann dadurch nicht abgesenkt werden. Es wird nicht pauschal die neueste
-GitHub-Version erzwungen, und ein GitHub-Ausfall sperrt keinen zugelassenen Client.
+Die Mindest-Clientversion ist ab 2.1 ausschliesslich im Server-Release festgelegt.
+Eine alte `MINIMUM_CLIENT_VERSION`-Variable wird ignoriert. Es wird nicht pauschal
+die neueste GitHub-Version erzwungen.
 
 - Docker mit Compose, etwa die Docker-Projektverwaltung eines NAS.
 - Eine erreichbare paperless-ngx-Instanz und ein API-Token mit Leserechten auf
@@ -39,7 +77,6 @@ GitHub-Version erzwungen, und ein GitHub-Ausfall sperrt keinen zugelassenen Clie
    | `ADMIN_API_KEYS` | Separate Admin-Schluessel, mindestens 32 Zeichen je Schluessel |
    | `RESERVATION_TTL_SECONDS` | Lebensdauer nie gestarteter Reservierungen; Standard 300, Bereich 30 bis 3600 |
    | `PRINTING_SETTLE_SECONDS` | Wartezeit vor Anzeige eines unbestaetigten Drucks als unklar; Standard 30, mindestens 10 |
-   | `MINIMUM_CLIENT_VERSION` | Mindestversion des Clients, Standard 2.0.0; kann fuer Sicherheitsupdates angehoben werden |
    | `SQLITE_PATH` | Datenbank im persistenten Volume, Standard `/data/reservations.sqlite3` |
    | `NAS_BIND_IP` | Hostadresse fuer Port 8765; Standard `127.0.0.1` |
 

@@ -1,5 +1,13 @@
 # Client Changelog
 
+## 2.1.0
+
+- Optionaler Konsolenclient `asnlbl` mit verwaltetem PATH-Eintrag; Auswahl bleibt bei Updates erhalten.
+- `asnlbl help`, Kurzflags `-c`, `-s`, `-h`, `-v` und separate Anleitung in docs/CLI.md.
+- Einzel- und Seriendruck (1-10), optionaler Einzelschnitt, JSON-Zeilen und eindeutige Exitcodes.
+- Gleiche Medienpruefung und Reservierungs-/Druckbestaetigung wie in der Oberflaeche; keine automatischen Wiederholungen nach unklarem Druck.
+- CLI verweigert den Start bei geoeffneter App oder zweiter CLI in derselben Windows-Sitzung; Installer erkennt laufende CLI-Auftraege.
+
 ## 2.0.0
 
 - Windows-Installer mit benutzerbezogener oder systemweiter Installation.

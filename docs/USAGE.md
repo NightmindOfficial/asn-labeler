@@ -93,3 +93,15 @@ Absturz vor Speicherung der Druckbestaetigung kann zu Unterzaehlung fuehren.
 Der farblich markierte Demo-Modus simuliert Server und Drucker lokal, ohne echte
 API-Aufrufe oder Ausdrucke. Er eignet sich zum Kennenlernen der Oberflaeche;
 fuer echte Drucke muss er ausgeschaltet werden.
+
+## Drucken ohne Fenster (ab 2.1)
+
+Die optionale CLI im Installer aktivieren, App einrichten und schliessen.
+Danach ein neues Terminal oeffnen:
+
+```powershell
+asnlbl help
+asnlbl print -c 3
+```
+
+Syntax, Flags, Installation und Exitcodes stehen in der separaten [CLI-Anleitung](CLI.md).
