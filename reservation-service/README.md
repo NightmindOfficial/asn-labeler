@@ -2,14 +2,14 @@
 
 ## Updates ab 2.1
 
-Standardmaessig gibt es nur Hinweise im Adminpanel. Stuendlich wird ohne
-API-Schluessel oder Dokumentdaten die offizielle GitHub-Release-Richtlinie gelesen.
+standardmäßig gibt es nur Hinweise im Adminpanel. Stündlich wird ohne
+API-Schlüssel oder Dokumentdaten die offizielle GitHub-Release-Richtlinie gelesen.
 Nur nachweislich unsichere Versionen sperren neue Reservierungen, Druckstarts und
-Sekundaerlabel-Starts. Bestaetigungen und sichere Freigaben bleiben moeglich.
+Sekundärlabel-Starts. Bestätigungen und sichere Freigaben bleiben möglich.
 Ein unbekannter Stand oder GitHub-Ausfall erzeugt keine Sperre; eine bereits
 bekannte Sperre bleibt jedoch auch nach Neustart und Netzausfall erhalten.
 
-Fuer fertige Docker-Images die `docker-compose.registry.yml` im **bestehenden**
+Für fertige Docker-Images die `docker-compose.registry.yml` im **bestehenden**
 Compose-Projekt verwenden. Projektname, `.env`, Datenvolume und Netz bleiben gleich.
 Der Standardtag `stable` folgt stabilen Server-Releases. Beim ersten GHCR-Release
 muss der Herausgeber das Paket einmal auf Public stellen. Plattform: linux/amd64.
@@ -24,64 +24,64 @@ sh update-server.sh DEIN_BISHERIGER_COMPOSE_PROJEKTNAME --apply
 ```
 
 Voraussetzungen: Docker Compose v2 und `flock` auf dem Host, Service mindestens
-2.1 installiert. In einem Aufgabenplaner (z. B. cron) kann der zweite Befehl regelmaessig laufen;
+2.1 installiert. In einem Aufgabenplaner (z. B. cron) kann der zweite Befehl regelmäßig laufen;
 ohne diese eigene Aktivierung gibt es keine automatische Installation.
-Den echten Projektnamen aus der Docker-UI uebernehmen, keinen neuen erfinden.
+Den echten Projektnamen aus der Docker-UI übernehmen, keinen neuen erfinden.
 Das Skript verweigert unbekannte Projekte und Downgrades, pinnt den geladenen
-Image-Digest und setzt vor dem Austausch eine 30-minuetige Wartungssperre.
-Unbestaetigte Drucke (auch unklare) oder Sekundaerlabels verschieben das Update.
+Image-Digest und setzt vor dem Austausch eine 30-minütige Wartungssperre.
+Unbestätigte Drucke (auch unklare) oder Sekundärlabels verschieben das Update.
 Vor dem Austausch liegt ein SQLite-Backup unter `/data/backups`. Backups nach
-Bedarf archivieren; sie werden nicht automatisch geloescht. Der Service bekommt
-keinen Docker-Socket. Bei Fehlern Logs pruefen, niemals automatisch eine alte
-Datenbank zurueckspielen: Zwischenzeitliche Labels koennten sonst doppelt werden.
+Bedarf archivieren; sie werden nicht automatisch gelöscht. Der Service bekommt
+keinen Docker-Socket. Bei Fehlern Logs prüfen, niemals automatisch eine alte
+Datenbank zurückspielen: Zwischenzeitliche Labels könnten sonst doppelt werden.
 
-Bei einem unbestaetigten Sekundaerlabel, das nicht mehr aufgeloest werden kann,
-Clients und Drucker manuell stoppen und das Update ueber Docker Compose durchfuehren.
+Bei einem unbestätigten Sekundärlabel, das nicht mehr aufgelöst werden kann,
+Clients und Drucker manuell stoppen und das Update über Docker Compose durchführen.
 Dabei die Datenbank behalten. Das automatische Skript umgeht diese Sperre nicht.
 
-Der Dienst koordiniert ASN-Nummern fuer eine Paperless-Instanz. SQLite speichert
-Reservierungen, Druckzustaende, Sekundaerlabel-Auftraege und den Aenderungsverlauf.
-Das Adminpanel ist unter `/admin/` erreichbar. Version und API-Faehigkeiten liefert
-`/health`. Der Dienst laedt keine Dokumente zu Paperless hoch.
+Der Dienst koordiniert ASN-Nummern für eine Paperless-Instanz. SQLite speichert
+Reservierungen, Druckzustände, Sekundärlabel-Aufträge und den Änderungsverlauf.
+Das Adminpanel ist unter `/admin/` erreichbar. Version und API-Fähigkeiten liefert
+`/health`. Der Dienst lädt keine Dokumente zu Paperless hoch.
 
 ## Voraussetzungen
 
-Ab Service 2.0 wird Client 2.0 oder neuer benoetigt. Zuerst den Client per Setup
-installieren, dann den Service aktualisieren. Die Versionssperre gilt fuer neue
-Clientaktionen; bestehende eigene Druckauftraege duerfen noch bestaetigt werden.
+Ab Service 2.0 wird Client 2.0 oder neuer benötigt. Zuerst den Client per Setup
+installieren, dann den Service aktualisieren. Die Versionssperre gilt für neue
+Clientaktionen; bestehende eigene Druckaufträge dürfen noch bestätigt werden.
 Adminpanel und administrative Werkzeuge bleiben mit separatem Admin-Key erreichbar.
-Die Mindest-Clientversion ist ab 2.1 ausschliesslich im Server-Release festgelegt.
+Die Mindest-Clientversion ist ab 2.1 außchließlich im Server-Release festgelegt.
 Eine alte `MINIMUM_CLIENT_VERSION`-Variable wird ignoriert. Es wird nicht pauschal
 die neueste GitHub-Version erzwungen.
 
 - Docker mit Compose auf einem Linux-Host, einer VM, einem Cloudserver oder NAS.
 - Eine erreichbare paperless-ngx-Instanz und ein API-Token mit Leserechten auf
   alle Dokumente des verwendeten ASN-Nummernkreises.
-- Einen eigenen langen Client-Schluessel und einen davon verschiedenen
-  Admin-Schluessel. Beide sind Zugangsdaten und duerfen nicht veroeffentlicht werden.
+- Einen eigenen langen Client-Schlüssel und einen davon verschiedenen
+  Admin-Schlüssel. Beide sind Zugangsdaten und dürfen nicht veröffentlicht werden.
 
 ## Einrichtung
 
-1. Dieses Service-Verzeichnis oder das vollstaendige Server-Releasepaket in einen
+1. Dieses Service-Verzeichnis oder das vollständige Server-Releasepaket in einen
    dauerhaften Projektordner kopieren. `web/`, `licenses/`, `tests/` und alle
-   Build-Dateien werden benoetigt. Keine Verzeichnisse auf `/opt/asn` mounten.
+   Build-Dateien werden benötigt. Keine Verzeichnisse auf `/opt/asn` mounten.
 2. `.env.example` als `.env` kopieren und die Platzhalter ersetzen:
 
    | Variable | Bedeutung |
    | --- | --- |
    | `PAPERLESS_URL` | Vom Container aus erreichbare Paperless-Adresse |
    | `PAPERLESS_TOKEN` | Paperless-API-Token |
-   | `ASN_PREFIX` | Barcode-Praefix, muss der Paperless-Konfiguration entsprechen |
+   | `ASN_PREFIX` | Barcode-Präfix, muss der Paperless-Konfiguration entsprechen |
    | `ASN_PADDING` | Mindestanzahl der Ziffern; Standard 5 |
-   | `API_KEYS` | Kommagetrennte Client-Schluessel, mindestens 32 Zeichen je Schluessel |
-   | `ADMIN_API_KEYS` | Separate Admin-Schluessel, mindestens 32 Zeichen je Schluessel |
+   | `API_KEYS` | Kommagetrennte Client-Schlüssel, mindestens 32 Zeichen je Schlüssel |
+   | `ADMIN_API_KEYS` | Separate Admin-Schlüssel, mindestens 32 Zeichen je Schlüssel |
    | `RESERVATION_TTL_SECONDS` | Lebensdauer nie gestarteter Reservierungen; Standard 300, Bereich 30 bis 3600 |
-   | `PRINTING_SETTLE_SECONDS` | Wartezeit vor Anzeige eines unbestaetigten Drucks als unklar; Standard 30, mindestens 10 |
+   | `PRINTING_SETTLE_SECONDS` | Wartezeit vor Anzeige eines unbestätigten Drucks als unklar; Standard 30, mindestens 10 |
    | `SQLITE_PATH` | Datenbank im persistenten Volume, Standard `/data/reservations.sqlite3` |
-   | `NAS_BIND_IP` | Hostadresse fuer Port 8765; Standard `127.0.0.1` |
+   | `NAS_BIND_IP` | Hostadresse für Port 8765; Standard `127.0.0.1` |
 
    `localhost` in `PAPERLESS_URL` bezeichnet den Service-Container, nicht den Host
-   oder einen anderen Container. Zufallsschluessel separat erzeugen, beispielsweise
+   oder einen anderen Container. Zufallsschlüssel separat erzeugen, beispielsweise
    mit `python -c "import secrets; print(secrets.token_urlsafe(32))"`.
 3. In der Docker-Projektverwaltung ein Compose-Projekt mit der mitgelieferten Datei anlegen
    und bauen/starten. Alternativ im Service-Ordner:
@@ -90,14 +90,14 @@ die neueste GitHub-Version erzwungen.
    docker compose up -d --build
    ```
 
-4. `/health` ueber die konfigurierte Adresse aufrufen. Erwartet werden `ok: true`
-   und die installierte Versionsnummer. Anschliessend `/admin/` oeffnen,
-   mit einem Admin-Schluessel anmelden und die Paperless-Verbindung pruefen.
-5. Im Windows-Client dieselbe Basisadresse und einen Client-Schluessel eintragen.
-   Demo-Modus ausschalten. Fuer einen HTTPS-Tunnel keine interne Portnummer anhaengen.
+4. `/health` über die konfigurierte Adresse aufrufen. Erwartet werden `ok: true`
+   und die installierte Versionsnummer. Anschließend `/admin/` öffnen,
+   mit einem Admin-Schlüssel anmelden und die Paperless-Verbindung prüfen.
+5. Im Windows-Client dieselbe Basisadresse und einen Client-Schlüssel eintragen.
+   Demo-Modus ausschalten. Für einen HTTPS-Tunnel keine interne Portnummer anhängen.
 
 Das benannte Datenvolume `asn-reservation-data` bleibt bei Container-Neustarts
-erhalten. Projektname und Volume sind Teil der Installation und duerfen beim
+erhalten. Projektname und Volume sind Teil der Installation und dürfen beim
 Update nicht versehentlich gewechselt werden.
 
 ## Netzwerk und Zugriff
@@ -105,45 +105,45 @@ Update nicht versehentlich gewechselt werden.
 `NAS_BIND_IP` und `*-nas.zip` sind historische Namen und bleiben kompatibel.
 Sie setzen kein NAS voraus. Der Dienst kann auf jedem passenden Docker-Host laufen.
 
-Die Voreinstellung bindet Port 8765 nur lokal am Host. Fuer direkten LAN-Zugriff
+Die Voreinstellung bindet Port 8765 nur lokal am Host. Für direkten LAN-Zugriff
 `NAS_BIND_IP` auf die konkrete LAN-IP des Hosts setzen; der direkte Port bietet
-selbst kein TLS. Fuer oeffentlichen Zugriff einen HTTPS-Reverse-Proxy verwenden.
+selbst kein TLS. Für öffentlichen Zugriff einen HTTPS-Reverse-Proxy verwenden.
 
 Ein Cloudflare-Tunnel kann intern an `http://asn-reservation:8765` weiterleiten,
 wenn sein Container am Standardnetzwerk dieses Compose-Projekts angeschlossen
-ist. Die Service-Compose benoetigt dafuer kein externes Netzwerk. Im Client steht
+ist. Die Service-Compose benötigt dafür kein externes Netzwerk. Im Client steht
 dann beispielsweise `https://asn.example.com`, ohne `:8765`.
 
-Client- und Admin-Endpunkte verwenden Bearer-Schluessel. Fehlende Admin-Schluessel
-deaktivieren Admin-Funktionen. Die oeffentlichen Pfade `/health`, `/admin/` und
-die statischen Panel-/Lizenz-/Quellcode-Dateien benoetigen keinen Schluessel;
-sie enthalten keine Dokumentdaten. Lizenz und Service-Quellcode sind ueber den
+Client- und Admin-Endpunkte verwenden Bearer-Schlüssel. Fehlende Admin-Schlüssel
+deaktivieren Admin-Funktionen. Die öffentlichen Pfade `/health`, `/admin/` und
+die statischen Panel-/Lizenz-/Quellcode-Dateien benötigen keinen Schlüssel;
+sie enthalten keine Dokumentdaten. Lizenz und Service-Quellcode sind über den
 Footer erreichbar.
 
 ## Administration und Updates
 
 - Dokumente und Reservierungen werden getrennt angezeigt, jeweils nach ASN
   absteigend. Die Dokumentliste umfasst die vom Dienst verwalteten Reservierungen,
-  nicht alle unabhaengig davon in Paperless angelegten Dokumente.
+  nicht alle unabhängig davon in Paperless angelegten Dokumente.
 - Aktualisierungsintervall und Wartungsaktionen stehen in den Einstellungen.
-  Der Aenderungsverlauf zeigt die neuesten Eintraege zuerst und laedt weitere
-  bei Bedarf. Sekundaerlabels werden als bestaetigte Kopien gezaehlt.
-- Vor Updates ein Backup herunterladen, aktive Druckauftraege beenden und die
+  Der Änderungsverlauf zeigt die neuesten Einträge zuerst und lädt weitere
+  bei Bedarf. Sekundärlabels werden als bestätigte Kopien gezählt.
+- Vor Updates ein Backup herunterladen, aktive Druckaufträge beenden und die
   Release Notes lesen. Paket im bestehenden Projektordner ersetzen; `.env` und
   Datenvolume behalten. Das Projekt neu bauen/bereitstellen, nicht nur neu starten.
-- Danach `/health`, Adminpanel und Client pruefen. Ein altes Panel nach einem
-  Versionswechsel neu laden. Bei Schemaaenderungen ist ein altes Image allein
+- Danach `/health`, Adminpanel und Client prüfen. Ein altes Panel nach einem
+  Versionswechsel neu laden. Bei Schemaänderungen ist ein altes Image allein
   kein geeigneter Rollback; eine Backup-Wiederherstellung muss alle inzwischen
-  physisch gedruckten Labels beruecksichtigen.
+  physisch gedruckten Labels berücksichtigen.
 
 Ein Abgleich gibt gedruckte oder unklare ASNs nicht pauschal frei. Der gespeicherte
-Paperless-Hoechststand sinkt auch nach Loeschung eines Paperless-Dokuments nicht
-automatisch. Korrekturen und Freigaben erfordern die vorgesehenen bestaetigten
-Admin-Aktionen und koennen durch geschuetzte Nummern verhindert werden.
+Paperless-Höchststand sinkt auch nach Löschung eines Paperless-Dokuments nicht
+automatisch. Korrekturen und Freigaben erfordern die vorgesehenen bestätigten
+Admin-Aktionen und können durch geschützte Nummern verhindert werden.
 
 Niemals `docker compose down -v` zur Fehlerbehebung verwenden. Eine alte Datenbank
 oder ein neues leeres Volume kann bereits gedruckte Labels vergessen und dadurch
-Doppelvergaben verursachen. Backups nicht parallel in einer zweiten unabhaengigen
+Doppelvergaben verursachen. Backups nicht parallel in einer zweiten unabhängigen
 Produktionsinstanz betreiben.
 
 ## Diagnose
@@ -154,16 +154,16 @@ docker compose logs --tail=100 asn-reservation
 
 Logs enthalten Request-ID, Route, HTTP-Status und Zustandswechsel. Zugangsdaten
 nicht in Fehlerberichte kopieren. Bei Paperless-Verbindungsfehlern URL, Token,
-Dokumentrechte und Erreichbarkeit aus dem Container pruefen.
+Dokumentrechte und Erreichbarkeit aus dem Container prüfen.
 
 Ein Fehler mit `/app/app.py` deutet auf einen alten Startbefehl hin: Das aktuelle
-Image startet `/opt/asn/app.py`. Command-Overrides und alte Images pruefen.
+Image startet `/opt/asn/app.py`. Command-Overrides und alte Images prüfen.
 Bei Schreibfehlern auf `/data` Volume und Rechte kontrollieren; nicht pauschal
 Root-Betrieb oder `chmod 777` aktivieren.
 
 ## Entwicklung und Quellcode
 
-Python 3.12 und die gepinnte Waitress-Abhaengigkeit installieren. Vom Service-Ordner:
+Python 3.12 und die gepinnte Waitress-Abhängigkeit installieren. Vom Service-Ordner:
 
 ```sh
 python -m pip install --require-hashes --only-binary=:all: -r requirements.txt
@@ -171,7 +171,7 @@ python package_source.py --output source.zip
 python -m unittest discover -s tests
 ```
 
-Bei lokalem Betrieb nach jeder Quellcodeaenderung das Archiv erneut erzeugen.
+Bei lokalem Betrieb nach jeder Qüllcodeänderung das Archiv erneut erzeugen.
 Der Docker-Build erledigt dies automatisch. Es werden nur festgelegte Quelldateien,
-Build-Eingaben, Tests, oeffentliche Dokumentation und Lizenzhinweise aufgenommen,
+Build-Eingaben, Tests, öffentliche Dokumentation und Lizenzhinweise aufgenommen,
 keine `.env` oder Datenbank. Lizenztexte stehen in `licenses/`.
