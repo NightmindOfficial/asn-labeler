@@ -7,6 +7,7 @@ from pathlib import Path
 from zipfile import ZIP_DEFLATED, ZipFile
 
 FILES = (
+    "security_policy.py", "policy-key.json",
     "app.py", "admin.py", "server_updates.py", "release-policy.json", "package_source.py", "Dockerfile", "docker-compose.yml",
     "requirements.txt", ".env.example", ".dockerignore", "README.md", "VERSION", "CHANGELOG.md",
     "maintenance.py", "docker-compose.registry.yml", "update-server.sh",

@@ -28,6 +28,7 @@ def client_source_files(root):
     """Only named public docs are distributed; local notes never follow globbing."""
     root = Path(root)
     files = [root / name for name in PUBLIC_DOCUMENTS]
+    files.append(root / "security/policy.json")
     files.extend(root / name for name in (
         "LICENSE", "NOTICE", "LICENSE-BPAC-EXCEPTION.txt", "package-release.py",
         "windows-app/build.ps1", "windows-app/build-installer.ps1", "windows-app/VERSION", ".gitignore", ".gitattributes",
@@ -39,6 +40,7 @@ def client_source_files(root):
                      and path.suffix not in (".pyc", ".download"))
     files.extend((root / "tools").rglob("*.py"))
     files.extend((root / "tools").rglob("*.cjs"))
+    files.extend((root / "tools").rglob("*.ps1"))
     files.extend((root / "docs" / "images").glob("*.png"))
     return sorted(files)
 
@@ -75,7 +77,7 @@ def main():
                 version_tuple(policy["minimumSafeServerVersion"]) > version_tuple(version)):
             raise ValueError("Release safety policy does not match server version")
         shutil.copyfile(SERVICE / "release-policy.json", output / "server-update-policy.json")
-        with ZipFile(output / ("asn-reservation-" + version + "-nas.zip"), "w") as archive:
+        with ZipFile(output / asset_names(version, "server")[0], "w") as archive:
             for path in service_files:
                 add(archive, path, SERVICE)
             add(archive, SERVICE / "source.zip", SERVICE)

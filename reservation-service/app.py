@@ -23,7 +23,7 @@ from urllib.parse import urlencode, urlsplit, parse_qs
 
 VERSION = Path(__file__).with_name("VERSION").read_text(encoding="utf-8").strip()
 INSTANCE_ID = uuid.uuid4().hex
-CLIENT_VERSION_FLOOR = "2.0.0"
+CLIENT_VERSION_FLOOR = "2.1.1"
 RECENT_LOGS = deque(maxlen=300)
 LOG_LOCK = threading.Lock()
 STATIC_DIR = Path(__file__).with_name("web")
@@ -45,6 +45,7 @@ TRANSITIONS = {"printing": {"reserved"}, "printed": {"printing"}, "released": {"
 REQUEST_ID = contextvars.ContextVar("request_id", default="local")
 ACTOR = contextvars.ContextVar("actor", default="local")
 OWNER = contextvars.ContextVar("owner", default="")
+REQUEST_CLIENT_VERSION = contextvars.ContextVar("client_version", default="")
 
 
 def version_parts(value):
@@ -57,7 +58,7 @@ def version_parts(value):
 
 
 def minimum_client_version():
-    return CLIENT_VERSION_FLOOR
+    return max(CLIENT_VERSION_FLOOR, server_updates().client_minimum(), key=version_parts)
 
 
 class AdmissionBlocked(Exception):
@@ -72,6 +73,16 @@ def check_admission(conn):
     lease = conn.execute("SELECT value FROM metadata WHERE key='update_maintenance_until'").fetchone()
     if lease and int(lease[0]) > now():
         raise AdmissionBlocked("service_maintenance")
+    client = REQUEST_CLIENT_VERSION.get()
+    floor = CLIENT_VERSION_FLOOR
+    if conn.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='security_policy'").fetchone():
+        central = conn.execute("SELECT server_minimum,client_minimum FROM security_policy WHERE id=1").fetchone()
+        if central and version_parts(VERSION) < version_parts(central[0]):
+            raise AdmissionBlocked("server_update_required")
+        if central:
+            floor = max(floor, central[1], key=version_parts)
+    if client and version_parts(client) < version_parts(floor):
+        raise AdmissionBlocked("client_update_required")
     if conn.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='server_update_policy'").fetchone():
         policy = conn.execute("SELECT minimum FROM server_update_policy WHERE id=1").fetchone()
         if policy and version_parts(VERSION) < version_parts(policy[0]):
@@ -853,6 +864,7 @@ class ApiRequest:
         REQUEST_ID.set(uuid.uuid4().hex)
         ACTOR.set("anonymous")
         OWNER.set("")
+        REQUEST_CLIENT_VERSION.set("")
         try:
             if method not in ("GET", "POST"):
                 return self.send_json({"error": "method not allowed"}, 405)
@@ -906,6 +918,7 @@ class ApiRequest:
             if method == "POST" and expected_version and expected_version != VERSION:
                 return self.send_json({"error": "Service updated. Reload the admin panel.", "errorCode": "admin_reload_required"}, 409)
             client_version = self.headers.get("X-ASN-Client-Version", "")
+            REQUEST_CLIENT_VERSION.set(client_version)
             # Only real admin credentials exempt the web/CLI admin, never a UI header.
             admin_request = not client_version and self.authorized(admin=True)
             if not admin_request and not completes_existing_job(method, path):
@@ -922,7 +935,7 @@ class ApiRequest:
                 self.route = path
                 updates = server_updates()
                 if method == "POST" and time.time() - updates.last_attempt >= 60:
-                    threading.Thread(target=updates.check, daemon=True).start()
+                    threading.Thread(target=updates.refresh, daemon=True).start()
                 return self.send_json(updates.status())
             new_work = (path in ("/api/reservations/next", "/api/documents/copy-labels/start") or
                         re.fullmatch(r"/api/reservations/[a-zA-Z0-9-]{1,64}/printing", path))
@@ -989,6 +1002,9 @@ class ApiRequest:
                     physical_label_absent=body.get("physicalLabelAbsent") is True))
             self.send_json({"error": "not found"}, 404)
         except AdmissionBlocked as exc:
+            if exc.code == "client_update_required":
+                return self.send_json({"error": "Client update required. No job started.", "errorCode": exc.code,
+                                       "minimumClientVersion": minimum_client_version()}, 426)
             return self.send_json({"error": "New print jobs are temporarily blocked; no job started.",
                               "errorCode": exc.code}, 503)
         except KeyError:

@@ -2,6 +2,15 @@
 
 ## Updates ab 2.1
 
+Ab 2.1.1 gilt mindestens Client 2.1.1. Den Installer zuerst manuell aktualisieren,
+danach den Service. Eine zusätzliche signierte Sicherheitsrichtlinie unter
+`security/policy.json` im offiziellen GitHub-Repository kann Mindestversionen
+unabhängig von einem neuen Release erhöhen. Der Service prüft beim Start und
+stündlich. Alte Server vor 2.1.1 kennen diese Richtlinie noch nicht.
+Erforderliche Releases müssen veröffentlicht sein, bevor eine neue zentrale
+Richtlinie aktiviert wird. Gespeicherte Sperren werden bei Ausfällen nicht gelöscht.
+Die eingebettete Mindest-Clientversion bleibt eine zusätzliche Untergrenze.
+
 standardmäßig gibt es nur Hinweise im Adminpanel. Stündlich wird ohne
 API-Schlüssel oder Dokumentdaten die offizielle GitHub-Release-Richtlinie gelesen.
 Nur nachweislich unsichere Versionen sperren neue Reservierungen, Druckstarts und
@@ -54,7 +63,7 @@ Die Mindest-Clientversion ist ab 2.1 außchließlich im Server-Release festgeleg
 Eine alte `MINIMUM_CLIENT_VERSION`-Variable wird ignoriert. Es wird nicht pauschal
 die neueste GitHub-Version erzwungen.
 
-- Docker mit Compose auf einem Linux-Host, einer VM, einem Cloudserver oder NAS.
+- Docker mit Compose auf einem geeigneten Host, lokal oder in der Cloud.
 - Eine erreichbare paperless-ngx-Instanz und ein API-Token mit Leserechten auf
   alle Dokumente des verwendeten ASN-Nummernkreises.
 - Einen eigenen langen Client-Schlüssel und einen davon verschiedenen
@@ -78,7 +87,7 @@ die neueste GitHub-Version erzwungen.
    | `RESERVATION_TTL_SECONDS` | Lebensdauer nie gestarteter Reservierungen; Standard 300, Bereich 30 bis 3600 |
    | `PRINTING_SETTLE_SECONDS` | Wartezeit vor Anzeige eines unbestätigten Drucks als unklar; Standard 30, mindestens 10 |
    | `SQLITE_PATH` | Datenbank im persistenten Volume, Standard `/data/reservations.sqlite3` |
-   | `NAS_BIND_IP` | Hostadresse für Port 8765; Standard `127.0.0.1` |
+   | `HOST_BIND_IP` | Hostadresse für Port 8765; Standard `127.0.0.1` |
 
    `localhost` in `PAPERLESS_URL` bezeichnet den Service-Container, nicht den Host
    oder einen anderen Container. Zufallsschlüssel separat erzeugen, beispielsweise
@@ -102,11 +111,14 @@ Update nicht versehentlich gewechselt werden.
 
 ## Netzwerk und Zugriff
 
-`NAS_BIND_IP` und `*-nas.zip` sind historische Namen und bleiben kompatibel.
-Sie setzen kein NAS voraus. Der Dienst kann auf jedem passenden Docker-Host laufen.
+Das Deployment-Paket heißt ab 2.1.1 `asn-reservation-<Version>.zip`.
+Beim Übernehmen der Compose-Dateien aus 2.1.1 den bisherigen Bind-Adressenschlüssel
+in `.env` in `HOST_BIND_IP` umbenennen und seinen Wert beibehalten. Ohne diesen
+Schlüssel gilt `127.0.0.1`; direkter LAN-Zugriff ist dann nicht verfügbar.
+Ein reines Image-Update verändert bestehende Compose-Dateien nicht.
 
 Die Voreinstellung bindet Port 8765 nur lokal am Host. Für direkten LAN-Zugriff
-`NAS_BIND_IP` auf die konkrete LAN-IP des Hosts setzen; der direkte Port bietet
+`HOST_BIND_IP` auf die konkrete LAN-IP des Hosts setzen; der direkte Port bietet
 selbst kein TLS. Für öffentlichen Zugriff einen HTTPS-Reverse-Proxy verwenden.
 
 Ein Cloudflare-Tunnel kann intern an `http://asn-reservation:8765` weiterleiten,

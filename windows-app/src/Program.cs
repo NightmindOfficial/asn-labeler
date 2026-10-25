@@ -645,13 +645,13 @@ namespace AsnLabeler
             updateChecking = true;
             try
             {
-                pendingUpdate = await Task.Run(() => ClientUpdates.Check(manual));
+                pendingUpdate = await Task.Run(() => ClientUpdates.Check());
                 if (IsDisposed) return;
                 Version required;
                 if (pendingUpdate != null && ClientRuntime.UpdateRequired &&
-                    (!Version.TryParse(ClientRuntime.RequiredVersion, out required) || ClientUpdates.ParseVersion(pendingUpdate.VersionText) < required)) pendingUpdate = null;
+                    (!Version.TryParse(ClientRuntime.EffectiveMinimum, out required) || ClientUpdates.ParseVersion(pendingUpdate.VersionText) < required)) pendingUpdate = null;
                 if (pendingUpdate == null && manual) MessageBox.Show(this, ClientRuntime.UpdateRequired
-                    ? ClientUpdates.Text("Der Server verlangt mindestens Client ", "The server requires client ") + ClientRuntime.RequiredVersion + ClientUpdates.Text(". Noch kein passendes Update verfügbar. Bitte den Administrator kontaktieren.", " or later. No matching update is available yet. Contact your administrator.")
+                    ? ClientUpdates.Text("Erforderliche Client-Version: ", "Required client version: ") + ClientRuntime.EffectiveMinimum + ClientUpdates.Text(". Noch kein passendes Update verfügbar. Bitte den Administrator kontaktieren.", " or later. No matching update is available yet. Contact your administrator.")
                     : ClientUpdates.Text("Die App ist aktuell.", "The app is up to date."), "Update", MessageBoxButtons.OK, MessageBoxIcon.Information);
                 OfferPendingUpdate();
             }
@@ -664,11 +664,11 @@ namespace AsnLabeler
 
         void OfferPendingUpdate()
         {
-            if (ClientRuntime.UpdateRequired && notifiedMinimum != ClientRuntime.RequiredVersion && !OperationRunning && !BpacPrinterSession.IsPrinting && ActiveForm == this && Enabled && !IsDisposed)
+            if (ClientRuntime.UpdateRequired && notifiedMinimum != ClientRuntime.EffectiveMinimum && !OperationRunning && !BpacPrinterSession.IsPrinting && ActiveForm == this && Enabled && !IsDisposed)
             {
-                notifiedMinimum = ClientRuntime.RequiredVersion;
+                notifiedMinimum = ClientRuntime.EffectiveMinimum;
                 UpdateStepAvailability();
-                MessageBox.Show(this, ClientUpdates.Text("Dieser Server benötigt mindestens Client ", "This server requires client ") + notifiedMinimum + ClientUpdates.Text(". Bitte aktualisieren. Neue Druckaufträge sind gesperrt; Einstellungen und Diagnose bleiben verfügbar.", " or later. Please update. New print jobs are blocked; settings and diagnostics remain available."),
+                MessageBox.Show(this, ClientUpdates.Text("Erforderliche Client-Version: ", "Required client version: ") + notifiedMinimum + ClientUpdates.Text(". Bitte aktualisieren. Neue Druckaufträge sind gesperrt; Einstellungen und Diagnose bleiben verfügbar.", " or later. Please update. New print jobs are blocked; settings and diagnostics remain available."),
                     ClientUpdates.Text("Update erforderlich", "Update required"), MessageBoxButtons.OK, MessageBoxIcon.Information);
                 CheckUpdates(true);
                 return;
@@ -2574,10 +2574,10 @@ namespace AsnLabeler
                     if (form.setupBpacButton.Visible != (available == false)) failures.Add("b-PAC setup visibility is incorrect.");
                     if (form.bpacStatus.Visible == form.setupBpacButton.Visible) failures.Add("b-PAC setup/status overlap.");
                 }
-                form.serverUrl.Text = "http://nas.test:9876";
+                form.serverUrl.Text = "http://server.test:9876";
                 form.demoMode.Checked = true;
                 form.Close();
-                if (form.config.ServerUrl != "http://nas.test:9876" || !form.config.DemoMode || form.DialogResult != DialogResult.OK)
+                if (form.config.ServerUrl != "http://server.test:9876" || !form.config.DemoMode || form.DialogResult != DialogResult.OK)
                     failures.Add("Closing settings did not apply pending edits.");
             }
             return failures;
@@ -3323,6 +3323,10 @@ namespace AsnLabeler
 
         T Request<T>(string method, string path, bool requireAuth, object payload = null)
         {
+            bool startsWork = path == "/api/reservations/next" || path == "/api/documents/copy-labels/start" || path.EndsWith("/printing", StringComparison.Ordinal);
+            if (startsWork && !ClientRuntime.DevelopmentMode) ClientUpdates.EnsureSafetyChecked();
+            if (ClientRuntime.UpdateRequired && startsWork)
+                throw new InvalidOperationException(ClientUpdates.Text("Client-Update erforderlich. Kein neuer Druck gestartet.", "Client update required. No new print started."));
             if (requireAuth) ClientRuntime.RequireInstallation();
             if (string.IsNullOrWhiteSpace(config.ServerUrl)) throw new InvalidOperationException(Loc.T("Server URL fehlt."));
             string apiKey = apiKeyOverride ?? config.ApiKey;

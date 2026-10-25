@@ -30,7 +30,7 @@ class MaintenanceTests(unittest.TestCase):
             statuses = []
             response = self.app.wsgi_app({"REQUEST_METHOD": "POST", "PATH_INFO": "/api/reservations/next",
                 "wsgi.input": io.BytesIO(), "HTTP_AUTHORIZATION": "Bearer secret",
-                "HTTP_X_ASN_CLIENT_VERSION": "2.1.0", "HTTP_X_ASN_API_VERSION": "1"},
+                "HTTP_X_ASN_CLIENT_VERSION": "2.1.1", "HTTP_X_ASN_API_VERSION": "1"},
                 lambda status, headers: statuses.append(status))
             self.assertTrue(statuses[0].startswith("503"))
             self.assertEqual(json.loads(response[0])["errorCode"], "service_maintenance")

@@ -17,6 +17,17 @@ from verify_artifacts import validate_archive
 
 
 class VersionTests(unittest.TestCase):
+    def test_server_deployment_asset_name(self):
+        self.assertEqual(asset_names("2.1.1", "server"),
+                         ["asn-reservation-2.1.1.zip", "server-update-policy.json"])
+
+    def test_compose_bind_address_matches_example(self):
+        service = Path(__file__).resolve().parents[2] / "reservation-service"
+        self.assertIn("HOST_BIND_IP=127.0.0.1", (service / ".env.example").read_text())
+        for filename in ("docker-compose.yml", "docker-compose.registry.yml"):
+            self.assertIn('${HOST_BIND_IP:-127.0.0.1}:8765:8765',
+                          (service / filename).read_text())
+
     def test_independent_version_files(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -141,7 +152,7 @@ class ArtifactTests(unittest.TestCase):
     def test_server_manifest_does_not_need_client_assets(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
-            (root / "asn-reservation-2.0.0-nas.zip").write_bytes(b"test")
+            (root / "asn-reservation-2.0.0.zip").write_bytes(b"test")
             write_manifest(root, "2.0.0", "a" * 40, "server")
             self.assertEqual(len(verify_manifest(root, "2.0.0", "a" * 40, "server")), 3)
 
