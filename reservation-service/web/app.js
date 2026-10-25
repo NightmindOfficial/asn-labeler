@@ -2,9 +2,52 @@
 (() => {
   const $ = id => document.getElementById(id);
   const T = ASNLocale.t;
+  // Keep the developer preference separate from authentication and permissions.
+  const developerSetting = document.createElement("label");
+  developerSetting.className = "developer-setting";
+  const developerSwitch = document.createElement("input");
+  developerSwitch.type = "checkbox"; developerSwitch.id = "developerMode";
+  developerSwitch.setAttribute("role", "switch");
+  const developerLabel = document.createElement("span");
+  developerSetting.append(developerSwitch, developerLabel);
+  document.querySelector("#settingsDialog .maintenance").before(developerSetting);
+  function developerCaption() { developerLabel.textContent = T("Entwicklermodus"); }
+  developerCaption();
+  try { developerSwitch.checked = localStorage.getItem("asn-admin.developerMode") === "true"; } catch (_) {}
+  document.querySelector('[data-tab="logs"]').hidden = !developerSwitch.checked;
+  developerSwitch.onchange = () => {
+    try { localStorage.setItem("asn-admin.developerMode", String(developerSwitch.checked)); } catch (_) {}
+    document.querySelector('[data-tab="logs"]').hidden = !developerSwitch.checked;
+    if (!developerSwitch.checked && tab === "logs") document.querySelector('[data-tab="documents"]').click();
+  };
+  let documentController = null;
+  $("closeDocument").onclick = () => $("documentDialog").close();
+  $("documentDialog").addEventListener("close", () => documentController?.abort());
+  document.querySelectorAll("[data-document]").forEach(link => link.onclick = async event => {
+    event.preventDefault();
+    documentController?.abort();
+    const controller = new AbortController(); documentController = controller;
+    $("documentDialogTitle").textContent = T(link.dataset.document);
+    $("documentContent").textContent = T("Wird geladen…");
+    $("documentSource").hidden = link.pathname !== "/admin/license";
+    $("documentDialog").showModal();
+    const timer = setTimeout(() => controller.abort(), 15000);
+    try {
+      const response = await fetch(link.href, {cache:"no-store", credentials:"omit", redirect:"error", signal:controller.signal});
+      if (!response.ok || !response.headers.get("Content-Type")?.includes("text/plain")) throw new Error();
+      const content = await response.text();
+      if (documentController === controller && $("documentDialog").open) {
+        $("documentContent").textContent = content;
+        $("documentContent").scrollTop = 0;
+      }
+    } catch (_) {
+      if (documentController === controller && $("documentDialog").open) $("documentContent").textContent = T("Inhalt konnte nicht geladen werden. Bitte schließe den Dialog und versuche es erneut.");
+    } finally { clearTimeout(timer); }
+  });
   new ResizeObserver(entries => document.documentElement.style.setProperty("--footer-height", entries[0].target.getBoundingClientRect().height + "px")).observe(document.querySelector("footer"));
   $("language").onchange = () => {
     ASNLocale.apply($("language").value);
+    developerCaption();
     notice("");
     if (key) run(async () => { lastView = ""; await load(); });
   };
@@ -114,7 +157,7 @@
   async function run(action) {
     if (busy || disconnected || updateRequired) return;
     busy = true; $("busy").hidden = autoRefreshing;
-    const controls = [...document.querySelectorAll("button,input,select")].filter(e => !e.closest("#confirmDialog,#updateDialog,#connectionDialog"));
+    const controls = [...document.querySelectorAll("button,input,select")].filter(e => !e.closest("#confirmDialog,#updateDialog,#connectionDialog,#documentDialog"));
     const states = controls.map(e => e.disabled); controls.forEach(e => e.disabled = true);
     try { await action(); } catch (error) { if (!error.connection) notice(error.message, true); }
     finally { controls.forEach((e,i) => e.disabled = states[i]); busy = false; $("busy").hidden = true; refreshAt = performance.now() + refreshInterval; updatePager(); }
@@ -134,14 +177,14 @@
     $("next").disabled = busy || !hasNext;
   }
   function row(values) { const tr = document.createElement("tr"); for (const value of values) { const td = document.createElement("td"); if (value instanceof Node) td.append(value); else td.textContent = String(value ?? "—"); tr.append(td); } $("rows").append(tr); }
-  function documentTitle(item) {
-    const label = document.createElement("span"); label.textContent = item.documentTitle || "—";
+  function documentStatus(item) {
+    const label = document.createElement("span"); label.className = "document-status"; label.append(status(item.status));
     if (Number.isInteger(item.secondaryLabelCount) && item.secondaryLabelCount > 0) {
       const marker = document.createElement("span"); marker.className = "copy-marker"; marker.tabIndex = 0;
       marker.title = T("Zu diesem Dokument wurden {0} Sekundärlabels erstellt.").replace("{0}", item.secondaryLabelCount);
       marker.setAttribute("aria-label", marker.title);
-      const icon = document.createElement("span"); icon.className = "material-icon"; icon.textContent = "\ue14d"; icon.setAttribute("aria-hidden", "true");
-      marker.append(icon, document.createTextNode(" " + item.secondaryLabelCount)); label.append(marker);
+      marker.classList.toggle("multiple", item.secondaryLabelCount > 1);
+      label.append(marker);
     }
     return label;
   }
@@ -197,7 +240,7 @@
       headers(["ASN","Status",T("Dokumenttitel"),T("Aktualisiert"),T("Aktion")]);
       $("connection").textContent = T("Verbunden · ASN ") + data.paperlessMax;
       $("maximum").textContent = Math.max(Number($("maximum").textContent) || 0, data.paperlessMax);
-      data.items.forEach(item => { const action = document.createElement("span"); if (["pending","uncertain"].includes(item.status)) { const button=document.createElement("button"); button.textContent=item.status === "pending" ? T("Abbrechen…") : T("Beheben…"); button.addEventListener("click",()=>run(()=>resolve(item))); action.append(button); } if(item.status === "blocked") action.append(unblockButton(item.reservationId,item.barcodeText)); row([item.barcodeText,status(item.status),documentTitle(item),time(item.updatedAt),action]); });
+      data.items.forEach(item => { const action = document.createElement("span"); if (["pending","uncertain"].includes(item.status)) { const button=document.createElement("button"); button.textContent=item.status === "pending" ? T("Abbrechen…") : T("Beheben…"); button.addEventListener("click",()=>run(()=>resolve(item))); action.append(button); } if(item.status === "blocked") action.append(unblockButton(item.reservationId,item.barcodeText)); row([item.barcodeText,documentStatus(item),item.documentTitle || "—",time(item.updatedAt),action]); });
       hasNext = page * 10 < data.total;
     } else if (tab === "state") {
       headers(["ASN",T("Lokaler Zustand"),T("Aktualisiert"),T("Reserviert bis"),T("Aktion")]);
@@ -208,8 +251,23 @@
       data.items.forEach(item=>row([item.seq+" / "+item.asn_number,time(item.time),T(names[item.old_status] || item.old_status || "Neu")+" → "+T(names[item.new_status] || item.new_status),item.reason === "admin_high_water_corrected" ? T("Höchststand korrigiert") : T(reasons[item.reason] || item.reason),item.actor]));
       hasNext = eventHasMore;
     } else {
-      headers([T("Zeit"),T("Ereignis"),"Details"]);
-      data.items.reverse().forEach(item=>{const detail=document.createElement("div"); detail.className="log-detail"; const {time:at,event,...rest}=item; detail.textContent=JSON.stringify(rest,null,2); row([time(at),event,detail]);});
+      headers([T("Zeit"),T("Ereignis"),"Details",T("Aktion")]);
+      data.items.slice().reverse().forEach(item=>{
+        const detail=document.createElement("div"); detail.className="log-detail";
+        const {time:at,event,...rest}=item; detail.textContent=JSON.stringify(rest,null,2);
+        const copy=document.createElement("button"); copy.className="copy-log";
+        copy.title=T("Eintrag kopieren"); copy.setAttribute("aria-label",copy.title);
+        const icon=document.createElement("span"); icon.className="material-icon";
+        icon.textContent="\ue14d"; icon.setAttribute("aria-hidden","true"); copy.append(icon);
+        copy.onclick=async()=>{
+          try {
+            await navigator.clipboard.writeText(JSON.stringify(item,null,2));
+            icon.textContent="\ue876"; copy.title=T("Kopiert"); copy.setAttribute("aria-label",copy.title);
+            setTimeout(()=>{icon.textContent="\ue14d";copy.title=T("Eintrag kopieren");copy.setAttribute("aria-label",copy.title);},2000);
+          } catch (_) { notice(T("Kopieren fehlgeschlagen. Bitte die Browserberechtigung prüfen."),true); }
+        };
+        row([time(at),event,detail,copy]);
+      });
     }
     $("empty").hidden=!!$("rows").children.length; $("page").textContent=tab === "logs" ? T("Aktuelle Sitzung") : tab === "events" ? eventRows.length+T(" Änderungen") : T("Seite ")+page; updatePager();
   }
@@ -304,7 +362,7 @@
       return;
     }
     $("refreshCountdown").hidden = !key;
-    if (!key || busy || document.hidden || $("confirmDialog").open || $("settingsDialog").open) {
+    if (!key || busy || document.hidden || document.querySelector("dialog[open]")) {
       refreshAt = performance.now() + refreshInterval;
       $("refreshCountdown").textContent = autoRefreshing ? T("Wird aktualisiert…") : T("Refresh pausiert");
       return;

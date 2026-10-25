@@ -1,5 +1,14 @@
 # Server Changelog
 
+## 2.2.0
+
+- Öffentlicher Healthcheck auf Betriebs- und Kompatibilitätsangaben reduziert; Update-Diagnosen bleiben ausschließlich im authentifizierten Adminbereich verfügbar.
+- Service-Protokoll über den gespeicherten Entwicklermodus in den Einstellungen einblendbar; einzelne Ereignisse lassen sich kopieren.
+- Lizenzen, Drittanbieterhinweise und Changelog in lesbaren Dialogen. Quellcode-Download im Lizenzdialog statt im Footer.
+- Sekundärlabels durch einen gleich großen orangefarbenen Punkt am Dokumentstatus markiert: ausgefüllt bei einem Exemplar, Innenkontur bei mehreren. Die genaue Anzahl steht im Tooltip.
+- Hintergrund während geöffneter Dialoge gegen Scrollen gesperrt, einschließlich Verbindungsabbrüchen.
+- Keine Änderungen an `.env`, Datenbankschema oder ASN-Vergabe. Client 2.1.1 bleibt kompatibel.
+
 ## 2.1.1
 
 - Mindest-Clientversion 2.1.1: ältere Clients mit defektem Updater müssen einmal manuell aktualisiert werden. Bestehende Druckbestätigungen bleiben möglich.

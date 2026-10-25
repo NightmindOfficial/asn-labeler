@@ -23,6 +23,7 @@ RUN mkdir -p /opt/asn /data \
     && install -m 0644 /tmp/asn-source/policy-key.json /opt/asn/policy-key.json \
     && install -m 0644 /tmp/asn-source/maintenance.py /opt/asn/maintenance.py \
     && install -m 0644 /tmp/asn-source/VERSION /opt/asn/VERSION \
+    && install -m 0644 /tmp/asn-source/CHANGELOG.md /opt/asn/CHANGELOG.md \
     && chmod 0755 /opt /opt/asn /data \
     && find /opt/asn/web /opt/asn/licenses -type d -exec chmod 0755 {} + \
     && find /opt/asn/web /opt/asn/licenses -type f -exec chmod 0644 {} + \

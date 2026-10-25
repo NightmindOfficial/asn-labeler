@@ -873,6 +873,7 @@ class ApiRequest:
             downloads = {
                 "/admin/license": ("licenses/LICENSE", "text/plain; charset=utf-8", None),
                 "/admin/notices": ("licenses/THIRD-PARTY-NOTICES.md", "text/plain; charset=utf-8", None),
+                "/admin/changelog": ("CHANGELOG.md", "text/plain; charset=utf-8", None),
                 "/admin/source.zip": ("source.zip", "application/zip", "asn-reservation-source.zip"),
             }
             if method == "GET" and path in downloads:
@@ -903,7 +904,6 @@ class ApiRequest:
                 return self.send_json({"ok": True, "version": VERSION, "time": now(),
                     "apiVersion": 1,
                     "minimumClientVersion": minimum_client_version(),
-                    "serverUpdate": server_updates().status(),
                     "capabilities": ["safe-sync-v1", "physical-label-confirmation-v1", "secondary-label-tracking-v1"]})
             admin = path.startswith("/api/admin/") and path != "/api/admin/reset-to-paperless"
             if not self.authorized(admin):

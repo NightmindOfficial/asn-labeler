@@ -23,6 +23,8 @@ class ServerUpdateTests(unittest.TestCase):
         folder = tempfile.TemporaryDirectory()
         self.addCleanup(folder.cleanup)
         self.app = load_app(os.path.join(folder.name, "db"))
+        # Model an installed older server, independent of the release under test.
+        self.app.VERSION = "2.1.1"
         self.updates = self.app.server_updates()
 
     def test_unknown_and_network_failure_do_not_block(self):

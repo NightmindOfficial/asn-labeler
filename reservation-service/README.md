@@ -129,8 +129,11 @@ dann beispielsweise `https://asn.example.com`, ohne `:8765`.
 Client- und Admin-Endpunkte verwenden Bearer-Schlüssel. Fehlende Admin-Schlüssel
 deaktivieren Admin-Funktionen. Die öffentlichen Pfade `/health`, `/admin/` und
 die statischen Panel-/Lizenz-/Quellcode-Dateien benötigen keinen Schlüssel;
-sie enthalten keine Dokumentdaten. Lizenz und Service-Quellcode sind über den
-Footer erreichbar.
+sie enthalten keine Dokumentdaten. `/health` liefert nur Erreichbarkeit,
+Version, Zeit und den Kompatibilitätsvertrag für Clients. Ausführliche
+Update- und Sicherheitsdiagnosen erfordern einen Admin-Schlüssel.
+Lizenzen, Drittanbieterhinweise und Changelog öffnen sich über den Footer in
+Dialogen. Der Service-Quellcode bleibt im Lizenzdialog herunterladbar.
 
 ## Administration und Updates
 
@@ -138,6 +141,10 @@ Footer erreichbar.
   absteigend. Die Dokumentliste umfasst die vom Dienst verwalteten Reservierungen,
   nicht alle unabhängig davon in Paperless angelegten Dokumente.
 - Aktualisierungsintervall und Wartungsaktionen stehen in den Einstellungen.
+  Der dortige Schalter **Entwicklermodus** blendet das Service-Protokoll ein.
+  Die Einstellung wird im Browser gespeichert; standardmäßig bleibt das
+  Protokoll ausgeblendet. Einzelne Ereignisse lassen sich über ihr Kopier-Icon
+  für die Fehleranalyse übernehmen. Dafür ist HTTPS oder localhost erforderlich.
   Der Änderungsverlauf zeigt die neuesten Einträge zuerst und lädt weitere
   bei Bedarf. Sekundärlabels werden als bestätigte Kopien gezählt.
 - Vor Updates ein Backup herunterladen, aktive Druckaufträge beenden und die

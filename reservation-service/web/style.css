@@ -28,8 +28,9 @@ th,.status,td button{white-space:nowrap}
 #reconnected .material-icon{margin-right:8px}
 @keyframes connection-restored{from{opacity:0;transform:translate(-50%,8px)}to{opacity:1;transform:translate(-50%,0)}}
 @media(prefers-reduced-motion:reduce){.connection-spinner,#reconnected{animation:none}}
-.copy-marker{display:inline-flex;align-items:center;gap:3px;margin-left:8px;color:#126752;font-size:13px;white-space:nowrap;vertical-align:middle}
-.copy-marker .material-icon{font-size:16px}
+.document-status{display:inline-flex;align-items:center;gap:8px;white-space:nowrap;vertical-align:top}
+.copy-marker{display:inline-block;flex:0 0 1em;width:1em;height:1em;border-radius:50%;background:#f5a623}
+.copy-marker.multiple{background:transparent;box-shadow:inset 0 0 0 2px #f5a623}
 .copy-marker:focus-visible{outline:2px solid #126752;outline-offset:3px}
 body{min-height:100dvh;display:flex;flex-direction:column;padding-bottom:var(--footer-height,110px)}
 main{flex:1}
@@ -41,4 +42,22 @@ footer a:focus-visible{outline:2px solid #126752;outline-offset:4px}
 #serverUpdateNotice.error{border-color:#bd4434;background:#fff0ee;color:#7c211b}
 #serverUpdateNotice a{color:inherit;text-underline-offset:3px}
 #reconnected{bottom:calc(var(--footer-height,110px) + 12px)}
+/* Native modal dialogs make the page inert, but do not lock its scrollport. */
+html{scrollbar-gutter:stable}
+html:has(dialog[open]),html:has(dialog[open]) body{overflow:hidden}
+dialog{max-height:calc(100dvh - 32px);overscroll-behavior:contain}
+#documentDialog{max-width:820px;padding:24px}
+#documentDialog[open]{display:flex;flex-direction:column;gap:16px}
+#documentDialog .settings-heading{margin:0;flex-shrink:0}
+#documentDialog h2{overflow-wrap:anywhere;min-width:0}
+#closeDocument{padding:7px;min-width:40px;flex-shrink:0}
+#documentContent{min-height:0;overflow:auto;overscroll-behavior:contain;margin:0;padding:4px 8px 4px 0;white-space:pre-wrap;overflow-wrap:anywhere;font:14px/1.65 "Segoe UI",system-ui,sans-serif}
+#documentSource{align-self:flex-start;color:#126752;text-underline-offset:3px;flex-shrink:0}
+#settingsDialog .developer-setting{display:flex;align-items:center;gap:10px;cursor:pointer;min-height:44px}
+#developerMode{appearance:none;position:relative;flex-shrink:0;width:42px;height:24px;margin:0;border:1px solid #83939c;border-radius:12px;background:#dae1e5;cursor:pointer;transition:background .15s}
+#developerMode::after{content:"";position:absolute;top:3px;left:3px;width:16px;height:16px;border-radius:50%;background:#fff;box-shadow:0 1px 3px #26394344;transition:transform .15s}
+#developerMode:checked{background:#126752;border-color:#126752}
+#developerMode:checked::after{transform:translateX(18px)}
+td .copy-log{width:40px;min-height:40px;padding:7px}
+@media(prefers-reduced-motion:reduce){#developerMode,#developerMode::after{transition:none}}
 @media(max-width:650px){header{flex-wrap:wrap}.header-actions{margin-left:auto}.header-buttons{flex-wrap:wrap;justify-content:flex-end}}
