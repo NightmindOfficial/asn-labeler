@@ -15,6 +15,8 @@ class MaintenanceTests(unittest.TestCase):
         self.folder = tempfile.TemporaryDirectory()
         self.addCleanup(self.folder.cleanup)
         self.app = load_app(os.path.join(self.folder.name, "db"))
+        # Exercise an upgrade from a fixed historical version, not the build version.
+        self.app.VERSION = "2.1.1"
         spec = importlib.util.spec_from_file_location("maintenance_test", Path(__file__).parents[1] / "maintenance.py")
         self.maintenance = importlib.util.module_from_spec(spec)
         with mock.patch.dict("sys.modules", {"app": self.app}):

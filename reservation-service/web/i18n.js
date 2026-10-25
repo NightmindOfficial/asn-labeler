@@ -1,6 +1,11 @@
 "use strict";
 window.ASNLocale = (() => {
   const en = {
+    "Entwicklermodus":"Developer mode",
+    "Eintrag kopieren":"Copy entry", "Kopiert":"Copied",
+    "Kopieren fehlgeschlagen. Bitte die Browserberechtigung prüfen.":"Copy failed. Please check browser permissions.",
+    "Wird geladen…":"Loading…",
+    "Inhalt konnte nicht geladen werden. Bitte schließe den Dialog und versuche es erneut.":"Could not load content. Please close the dialog and try again.",
     "Verbindungsversuche nach zwei Minuten beendet. Bitte lade die Seite neu.":"Connection attempts stopped after two minutes. Please reload the page.",
     "Sicherheitsupdate erforderlich. Neue Druckaufträge sind gesperrt.":"Security update required. New print jobs are blocked.",
     "Server-Update verfügbar.":"Server update available.",

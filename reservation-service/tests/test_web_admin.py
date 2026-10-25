@@ -48,6 +48,29 @@ class WebAdminTests(unittest.TestCase):
         self.assertEqual(json.loads(data)["errorCode"], "admin_reload_required")
         reset.assert_not_called()
 
+    def test_public_health_exposes_only_liveness_and_client_contract(self):
+        with mock.patch.object(self.app.server_updates(), "status") as diagnostics:
+            status, _, body = self.call("/health", key="")
+        self.assertEqual(status, 200)
+        data = json.loads(body)
+        self.assertEqual(set(data), {"ok", "version", "time", "apiVersion",
+                                    "minimumClientVersion", "capabilities", "requestId"})
+        self.assertTrue(data["ok"])
+        self.assertEqual(data["apiVersion"], 1)
+        diagnostics.assert_not_called()
+
+    def test_public_documents_are_plain_text_and_keep_source_offer(self):
+        for path in ("/admin/license", "/admin/notices", "/admin/changelog"):
+            status, headers, body = self.call(path, key="")
+            self.assertEqual(status, 200)
+            self.assertEqual(dict(headers)["Content-Type"], "text/plain; charset=utf-8")
+            self.assertTrue(body)
+            if path.endswith("changelog"):
+                self.assertIn(("## " + self.app.VERSION).encode(), body)
+        shell = self.call("/admin/", key="")[2].decode()
+        self.assertIn('id="documentSource" href="/admin/source.zip"', shell)
+        self.assertNotIn('/admin/source.zip', shell.split('<footer>')[1])
+
     def test_current_and_legacy_clients_remain_compatible(self):
         with mock.patch.object(self.app, "paperless_max_asn", return_value=0):
             for version in (None, self.app.VERSION):

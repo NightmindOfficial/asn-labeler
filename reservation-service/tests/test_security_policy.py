@@ -15,6 +15,8 @@ class SecurityPolicyTests(unittest.TestCase):
         self.folder = tempfile.TemporaryDirectory()
         self.addCleanup(self.folder.cleanup)
         self.app = load_app(os.path.join(self.folder.name, "db"))
+        # Policy scenarios intentionally exercise an older installed release.
+        self.app.VERSION = "2.1.1"
         self.updates = self.app.server_updates()
         self.policy = dict(schema=1, revision=10, minimumClientVersion="2.2.0", minimumServerVersion="2.2.0", reason="test")
 
