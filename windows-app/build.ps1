@@ -34,6 +34,7 @@ $backends = Join-Path $root "src\PrinterBackends.cs"
 $matrix = Join-Path $root "src\DataMatrixLabels.cs"
 $copyLabels = Join-Path $root "src\CopyLabelForm.cs"
 $updates = Join-Path $root "src\Updates.cs"
+$cli = Join-Path $root "src\HeadlessCli.cs"
 $localization = Join-Path $root "src\Localization.cs"
 $english = Join-Path $root "src\en.json"
 $zxing = Join-Path $root "vendor\ZXing.Net\zxing.dll"
@@ -76,7 +77,7 @@ $iconArg = if (Test-Path $icon) { "/win32icon:$icon" } else { $null }
   "/resource:$material,AsnLabeler.MaterialIcons.ttf" `
   "/resource:$materialLicense,AsnLabeler.MaterialIcons.LICENSE" `
   "/resource:$english,AsnLabeler.en.json" `
-  "$src" "$backends" "$matrix" "$copyLabels" "$localization" "$versionSource" "$updates"
+  "$src" "$backends" "$matrix" "$copyLabels" "$localization" "$versionSource" "$updates" "$cli"
 
 if ($LASTEXITCODE -ne 0) {
     throw "C# compiler failed with exit code $LASTEXITCODE"
@@ -109,7 +110,7 @@ if ($LASTEXITCODE -ne 0) {
   "/resource:$material,AsnLabeler.MaterialIcons.ttf" `
   "/resource:$materialLicense,AsnLabeler.MaterialIcons.LICENSE" `
   "/resource:$english,AsnLabeler.en.json" `
-  "$src" "$backends" "$matrix" "$copyLabels" "$localization" "$versionSource" "$updates"
+  "$src" "$backends" "$matrix" "$copyLabels" "$localization" "$versionSource" "$updates" "$cli"
 
 if ($LASTEXITCODE -ne 0) {
     throw "C# test compiler failed with exit code $LASTEXITCODE"
@@ -120,3 +121,17 @@ if ([Diagnostics.FileVersionInfo]::GetVersionInfo($out).FileVersion -ne "$versio
 }
 Write-Host "Built $out ($version)"
 Write-Host "Built $testOut"
+
+& $csc /nologo /target:exe /define:CLI /codepage:65001 /optimize+ /platform:x64 `
+  "/win32manifest:$manifest" "/out:$dist\asn-labeler-cli.exe" $iconArg $licenseResources `
+  /reference:System.dll /reference:System.Core.dll /reference:System.Drawing.dll `
+  /reference:System.Management.dll /reference:Microsoft.CSharp.dll /reference:System.Xml.dll `
+  /reference:System.Xml.Linq.dll /reference:System.IO.Compression.dll `
+  /reference:System.Web.Extensions.dll /reference:System.Windows.Forms.dll `
+  "/reference:$zxing" "/resource:$zxing,AsnLabeler.zxing.dll" `
+  "/resource:$zxingLicense,AsnLabeler.ZXing.LICENSE" `
+  "/resource:$material,AsnLabeler.MaterialIcons.ttf" `
+  "/resource:$materialLicense,AsnLabeler.MaterialIcons.LICENSE" `
+  "/resource:$english,AsnLabeler.en.json" `
+  "$src" "$backends" "$matrix" "$copyLabels" "$localization" "$versionSource" "$updates" "$cli"
+if ($LASTEXITCODE -ne 0) { throw 'CLI compiler failed' }

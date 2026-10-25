@@ -1,60 +1,60 @@
 # Updates und Releases
 
-## Unabhaengige Versionen
+## Unabhängige Versionen
 
 - Client: `windows-app/VERSION` und `windows-app/CHANGELOG.md`.
 - Server inklusive Adminpanel: `reservation-service/VERSION` und `reservation-service/CHANGELOG.md`.
-- Format: `X.Y.Z`, ohne fuehrende Nullen; jeder Teil maximal 65534.
+- Format: `X.Y.Z`, ohne führende Nullen; jeder Teil maximal 65534.
 - Patch: Fehlerkorrektur. Minor: kompatible Erweiterung. Major: inkompatible
-  Aenderung am zugesicherten Vertrag der jeweiligen Komponente.
+  Änderung am zugesicherten Vertrag der jeweiligen Komponente.
 - Keine Gesamtversion. Das root-CHANGELOG bleibt als historische Zusammenfassung.
 
-Ein Branch und ein Pull Request koennen eine oder beide Komponenten aendern.
-Nur betroffene Komponenten erhalten hoehere Versionen und Release Notes unter
-genau einer nicht leeren Ueberschrift `## X.Y.Z`.
+Ein Branch und ein Pull Request können eine oder beide Komponenten ändern.
+Nur betroffene Komponenten erhalten höhere Versionen und Release Notes unter
+genau einer nicht leeren Überschrift `## X.Y.Z`.
 
 ## Ablauf
 
-1. In GitHub Desktop auf `main` wechseln, Fetch/Pull ausfuehren und von diesem aktuellen Stand einen neuen Entwicklungsbranch anlegen. Einen bereits gemergten Branch nicht fuer die naechste Version weiterverwenden. Implementieren und lokal testen.
-2. VERSION und CHANGELOG nur der geaenderten Komponenten aktualisieren.
+1. In GitHub Desktop auf `main` wechseln, Fetch/Pull ausführen und von diesem aktuellen Stand einen neuen Entwicklungsbranch anlegen. Einen bereits gemergten Branch nicht für die nächste Version weiterverwenden. Implementieren und lokal testen.
+2. VERSION und CHANGELOG nur der geänderten Komponenten aktualisieren.
 3. Committen, pushen und einen PR erstellen. Keine Laufzeitdaten committen.
-4. GitHub prueft Metadaten, Service-Tests, Windows-Build/Selbsttests, Paketgrenzen und Docker-Start. Beide Komponenten werden weiterhin getestet und gebaut.
-5. Nach gruenen Checks und erforderlichen Hardwaretests mergen.
-6. Auf `main` wiederholt GitHub die Pruefungen. Nur Komponenten mit ausstehender Veroeffentlichung erhalten Release-Pakete und einen eigenen GitHub Release.
-7. Unter Actions den erfolgreichen `main`-Lauf inklusive **Publish release** bestaetigen. Unter Releases die erwarteten Komponentenversionen und Downloads pruefen. Erst danach die gewuenschten Installationen aktualisieren.
+4. GitHub prüft Metadaten, Service-Tests, Windows-Build/Selbsttests, Paketgrenzen und Docker-Start. Beide Komponenten werden weiterhin getestet und gebaut.
+5. Nach grünen Checks und erforderlichen Hardwaretests mergen.
+6. Auf `main` wiederholt GitHub die Prüfungen. Nur Komponenten mit ausstehender Veröffentlichung erhalten Release-Pakete und einen eigenen GitHub Release.
+7. Unter Actions den erfolgreichen `main`-Lauf inklusive **Publish release** bestätigen. Unter Releases die erwarteten Komponentenversionen und Downloads prüfen. Erst danach die gewünschten Installationen aktualisieren.
 
-PR-Titel und Beschreibung sind frei waehlbar. VERSION und CHANGELOG bestimmen die Veroeffentlichung. Eine reine Aenderung dieser Anleitung braucht keinen Bump.
+PR-Titel und Beschreibung sind frei wählbar. VERSION und CHANGELOG bestimmen die Veröffentlichung. Eine reine Änderung dieser Anleitung braucht keinen Bump.
 
-Nur Client geaendert: `client-v1.5.0`. Nur Server geaendert: `server-v1.4.4`. Beide geaendert: zwei Releases aus einem Commit, ohne zweiten PR oder manuelle Tags.
+Nur Client geändert: `client-v1.5.0`. Nur Server geändert: `server-v1.4.4`. Beide geändert: zwei Releases aus einem Commit, ohne zweiten PR oder manuelle Tags.
 
-Die Checks blockieren Versionsrueckschritte, Wiederverwendung bereits getaggter
-neuer Versionen und Aenderungen innerhalb einer Komponente ohne Bump. Tests und
+Die Checks blockieren Versionsrückschritte, Wiederverwendung bereits getaggter
+neuer Versionen und Änderungen innerhalb einer Komponente ohne Bump. Tests und
 Markdown sind ausgenommen. Gemeinsame Lizenzdateien betreffen beide Komponenten.
-Reine CI-/Release-Werkzeug- oder Dokumentationsaenderungen duerfen ohne Release
+Reine CI-/Release-Werkzeug- oder Dokumentationsänderungen dürfen ohne Release
 gemergt werden. Bei gemeinsamem Build-/Paketcode entscheidet das Review, ob neue
 Auslieferungen und damit Versionsanhebungen erforderlich sind.
 
-## Gate und Veroeffentlichung
+## Gate und Veröffentlichung
 
-**CI gate** wird nur bei Erfolg aller vier Pruefjobs gruen. Der Ruleset erzwingt
-dies vor dem Merge. Fehler nach dem Merge verhindern die Veroeffentlichung,
-nicht rueckwirkend den Merge.
+**CI gate** wird nur bei Erfolg aller vier Prüfjobs grün. Der Ruleset erzwingt
+dies vor dem Merge. Fehler nach dem Merge verhindern die Veröffentlichung,
+nicht rückwirkend den Merge.
 
-Pro PR und fuer `main` existiert eine Concurrency-Gruppe. Laufende Runs werden
-nicht durch neue Pushes abgebrochen; GitHub kann wartende Zwischenstaende ersetzen.
-Der Publisher prueft vor und nach Upload, ob sein Commit noch `main` ist.
+Pro PR und für `main` existiert eine Concurrency-Gruppe. Laufende Runs werden
+nicht durch neue Pushes abgebrochen; GitHub kann wartende Zwischenstände ersetzen.
+Der Publisher prüft vor und nach Upload, ob sein Commit noch `main` ist.
 
-Nur gepruefte Artifacts aus demselben Run werden veroeffentlicht. Manifest und
+Nur geprüfte Artifacts aus demselben Run werden veröffentlicht. Manifest und
 SHA-256 binden sie an Komponente, Version und Commit. Uploads gehen zuerst in einen
-Entwurf; erst nach Pruefung wird veroeffentlicht. Fehler lassen den Entwurf offen.
+Entwurf; erst nach Prüfung wird veröffentlicht. Fehler lassen den Entwurf offen.
 Beim gleichen Commit ersetzt eine Wiederholung nur bekannte Entwurfs-Assets.
-Veroeffentlichte Releases werden nie geaendert. Fremde Tags/Entwuerfe werden
-nicht automatisch umgeschrieben; bei Konflikt bewusst pruefen oder neue Version nutzen.
+Veröffentlichte Releases werden nie geändert. Fremde Tags/Entwürfe werden
+nicht automatisch umgeschrieben; bei Konflikt bewusst prüfen oder neue Version nutzen.
 
 Zwei Releases sind keine atomare Transaktion: Gelingt einer und der zweite nicht,
-Run wiederholen. Der bereits veroeffentlichte bleibt unberuehrt. Keine globale
-Latest-Markierung fuer beide Produkte verwenden. Der Client-Updater filtert nach
-`client-v` und schliesst Entwuerfe/Vorabversionen aus. Ein Server-Updater muss
+Run wiederholen. Der bereits veröffentlichte bleibt unberührt. Keine globale
+Latest-Markierung für beide Produkte verwenden. Der Client-Updater filtert nach
+`client-v` und schließt Entwürfe/Vorabversionen aus. Ein Server-Updater muss
 entsprechend nach `server-v` filtern.
 
 ## Lokale Builds
@@ -77,12 +77,12 @@ Lokaler interaktiver Client-Test ohne Installation:
 ./windows-app/dist/asn-labeler-test.exe --development
 ```
 
-Pfade an die jeweilige Version anpassen. Server-Pakete benoetigen weder EXE noch
-ZXing-Download. Client-Releases ab 2.0 enthalten Setup-EXE und vollstaendiges Quellcode-ZIP;
-Server-Releases das NAS-ZIP inklusive Service-Quellcode. Beide enthalten
+Pfade an die jeweilige Version anpassen. Server-Pakete benötigen weder EXE noch
+ZXing-Download. Client-Releases ab 2.0 enthalten Setup-EXE und vollständiges Quellcode-ZIP;
+Server-Releases das Deployment-ZIP inklusive Service-Quellcode. Beide enthalten
 `release-manifest.json` und `SHA256SUMS.txt`. Die EXE bleibt unsigniert.
-Lokale Manifeste ohne GitHub Actions enthalten keinen bestaetigten CI-Commit.
-GitHub prueft zudem Erstinstallation, erneute Installation, Deinstallation und
+Lokale Manifeste ohne GitHub Actions enthalten keinen bestätigten CI-Commit.
+GitHub prüft zudem Erstinstallation, erneute Installation, Deinstallation und
 die Sperre bei laufender App, jeweils im Benutzer- und Systemmodus.
 Der Installer-Test darf lokal nur bewusst mit `-AllowLocalInstallationTest`
 gestartet werden; er verweigert vorhandene registrierte Installationen.
@@ -92,44 +92,75 @@ python -m unittest discover -s tools/tests
 python -m unittest discover -s windows-app/tests -p test_release_packaging.py
 ```
 
-## Kompatibilitaet und Updates
+## Kompatibilität und Updates
 
-Produktversionen sind keine API-Versionen. Massgeblich sind `apiVersion`, benoetigte `capabilities` und eine
-gegebenenfalls ausdruecklich gemeldete `minimumClientVersion` in `/health`.
-Aktuell unterstuetzt der Client API 1 und alte additive Health-Antworten ohne
-API-Feld; unbekannte APIs werden abgewiesen. Sekundaerlabels und sicherer Abgleich
-erfordern passende Faehigkeiten. Produkt-Major-Versionen werden nicht verglichen.
+Produktversionen sind keine API-Versionen. Maßgeblich sind `apiVersion`, benötigte `capabilities` und eine
+gegebenenfalls ausdrücklich gemeldete `minimumClientVersion` in `/health`.
+Aktuell unterstützt der Client API 1 und alte additive Health-Antworten ohne
+API-Feld; unbekannte APIs werden abgewiesen. Sekundärlabels und sicherer Abgleich
+erfordern passende Fähigkeiten. Produkt-Major-Versionen werden nicht verglichen.
 Eine neue inkompatible API braucht eine bewusst implementierte Migration;
-eine neue Produkt-VERSION allein aendert das API-Protokoll nicht.
+eine neue Produkt-VERSION allein ändert das API-Protokoll nicht.
 
-Ab Server 2.0 wird zusaetzlich mindestens Client 2.0 verlangt. Fuer einen
-Sicherheitsrelease `CLIENT_VERSION_FLOOR` im Service anheben; Administratoren
-koennen mit `MINIMUM_CLIENT_VERSION=X.Y.Z` in `.env` eine strengere Vorgabe
-setzen und den Dienst neu bereitstellen. Die Umgebungsvariable kann den
-Release-Mindeststand nicht absenken. Immer zuerst den benoetigten Client
-veroeffentlichen/installieren, danach die Sperre aktivieren.
-Client-API-Anfragen ohne gueltige oder mit zu alter `X-ASN-Client-Version`
-erhalten HTTP 426. Bestaetigungen bereits gestarteter eigener Auftraege und
-Freigaben nie gestarteter eigener Reservierungen bleiben moeglich. API 1 und
-Datenbankschema 3 bleiben gleich. Admin-Schluessel sind davon ausgenommen,
+Ab Server 2.0 wird zusätzlich mindestens Client 2.0 verlangt. Für einen
+Sicherheitsrelease `CLIENT_VERSION_FLOOR` im Service anheben. Seit 2.1 ist
+dies die einzige Vorgabe; `MINIMUM_CLIENT_VERSION` in `.env` wird ignoriert.
+Immer zuerst den benötigten Client
+veröffentlichen/installieren, danach die Sperre aktivieren.
+Client-API-Anfragen ohne gültige oder mit zu alter `X-ASN-Client-Version`
+erhalten HTTP 426. Bestätigungen bereits gestarteter eigener Aufträge und
+Freigaben nie gestarteter eigener Reservierungen bleiben möglich. API 1 und
+Datenbankschema 3 bleiben gleich. Admin-Schlüssel sind davon ausgenommen,
 solange keine Client-Version angegeben wird; nie in Clients hinterlegen.
 
 Client 2.0 erlaubt produktive API-Zugriffe nur aus seiner registrierten
 Installation. Der lokale Testbuild kann mit `--development` gestartet werden;
-die ausgelieferte EXE enthaelt diese Ausnahme nicht. Das ist kein kryptographischer
-Installationsnachweis: Ein veraenderter Client kann Versionsangaben nachahmen.
-Zugriffsschutz erfolgt weiterhin ueber getrennte API-Schluessel, spaeter Geraetefreigaben.
+die ausgelieferte EXE enthält diese Ausnahme nicht. Das ist kein kryptographischer
+Installationsnachweis: Ein veränderter Client kann Versionsangaben nachahmen.
 
-Adminpanel und Service gehoeren zusammen: Veraltete Adminseiten muessen nach
+## Server-Images und Sicherheitsrichtlinie ab 2.1
+
+`reservation-service/release-policy.json` muss dieselbe Version wie die
+Server-VERSION enthalten. `minimumSafeServerVersion` nur bei begründetem
+Sicherheitsbedarf anheben; ein normaler Release erfordert keine Sperre älterer
+Versionen. Die Datei wird als `server-update-policy.json` mitveröffentlicht.
+Server ab 2.1 fragen diese offizielle Richtlinie stündlich ab und speichern
+den höchsten jemals bekannten Mindeststand dauerhaft. Eine fehlerhafte Anhebung
+kann deshalb nicht durch Senken der nächsten Richtlinie rückgängig werden.
+
+CI speichert nach dem Docker-Smoke-Test genau das getestete linux/amd64-Image.
+Der Releasejob publiziert es als `ghcr.io/nightmindofficial/asn-reservation:X.Y.Z`;
+nach dem veröffentlichten GitHub-Release folgt der bewegliche Tag `stable`.
+Versions-Tags werden nicht mit anderen Inhalten überschrieben.
+Beim ersten Release muss das GHCR-Paket in GitHub unter Package settings auf
+**Public** gestellt werden, damit Installationen es ohne Zugangsdaten laden.
+Kein lokaler Test veröffentlicht Images oder Releases.
+Zugriffsschutz erfolgt weiterhin über getrennte API-Schlüssel, später Gerätefreigaben.
+
+Adminpanel und Service gehören zusammen: Veraltete Adminseiten müssen nach
 Server-Updates neu geladen werden. Das ist keine Client-Versionssperre.
 
 Ab Client 2.0 einmalig Setup installieren. Danach sucht der Client beim Start
-nach Updates (maximal einmal pro Stunde); manuell unter Einstellungen > Ueber.
-Download und Installation erfordern Bestaetigung. Waehrend Druckauftraegen wird
-kein Update angeboten. Setup startet nach dem Beenden der App und behaelt den
-Installationsmodus sowie Einstellungen/Zugangsdaten. Die Pruefsumme sichert die
-Dateiintegritaet, ersetzt aber keine Codesignatur. Es gibt keine automatische
-Server-Aktualisierung. NAS: Backup, Druckauftraege beenden, NAS-Paket entpacken, `.env`,
-Projektname und Volume behalten; UGREEN-Projekt neu bauen und bereitstellen.
-Danach `/health`, Adminpanel und Client pruefen. Noch kein Docker-Image auf GHCR.
-Migrationen und Kompatibilitaet in Release Notes beachten; Hardwaretests bleiben lokal.
+nach Updates (maximal einmal pro Stunde); manuell unter Einstellungen > Über.
+Download und Installation erfordern Bestätigung. Während Druckaufträgen wird
+kein Update angeboten. Setup startet nach dem Beenden der App und behält den
+Installationsmodus sowie Einstellungen/Zugangsdaten. Die Prüfsumme sichert die
+Dateiintegrität, ersetzt aber keine Codesignatur. Server-Updates sind standardmäßig
+manuell; ab 2.1 ist das externe Update-Skript ausdrücklich aktivierbar.
+Backup anlegen, Druckaufträge beenden und Image bzw. Deployment-Paket aktualisieren.
+Eigene `.env`, Projektname und Datenvolume behalten; danach `/health`, Adminpanel
+und Client prüfen. Details stehen in der Service-Anleitung.
+Migrationen und Kompatibilität in Release Notes beachten; Hardwaretests bleiben lokal.
+
+## Konfiguration bei jedem Update
+
+Jeder Release und jede Übergabe benennt ausdrücklich, ob sich `.env` ändert.
+Bei Änderungen: betroffene Variablen, alte/neue Defaults, erforderliche Schritte
+und Abwärtskompatibilität nennen. Auch geänderte Bedeutung unveränderter
+Variablennamen zählt. Ohne Änderung: `.env: unverändert`.
+
+**Service 2.1.0:** `MINIMUM_CLIENT_VERSION` entfällt aus `.env.example` und wird
+nicht mehr ausgewertet. Ein vorhandener Eintrag kann entfernt werden; die
+Mindestversion ist jetzt im Server-Release eingebettet. Wer bisher einen höheren
+eigenen Mindeststand gesetzt hat, verliert diese Überschreibung und muss die
+Release-Vorgabe vor dem Update prüfen. Sonstige Werte und Secrets beibehalten.

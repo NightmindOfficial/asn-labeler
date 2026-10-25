@@ -1,9 +1,11 @@
 FROM python:3.12-slim
+LABEL org.opencontainers.image.source="https://github.com/NightmindOfficial/asn-labeler"
 
 WORKDIR /opt/asn
 COPY requirements.txt /tmp/asn-requirements.txt
 RUN pip install --no-cache-dir --require-hashes --only-binary=:all: -r /tmp/asn-requirements.txt && rm /tmp/asn-requirements.txt
-COPY app.py admin.py package_source.py Dockerfile docker-compose.yml requirements.txt .env.example .dockerignore README.md VERSION CHANGELOG.md /tmp/asn-source/
+COPY app.py admin.py server_updates.py release-policy.json package_source.py Dockerfile docker-compose.yml requirements.txt .env.example .dockerignore README.md VERSION CHANGELOG.md /tmp/asn-source/
+COPY maintenance.py docker-compose.registry.yml update-server.sh /tmp/asn-source/
 COPY tests/ /tmp/asn-source/tests/
 COPY web/ /tmp/asn-source/web/
 COPY licenses/ /tmp/asn-source/licenses/
@@ -15,6 +17,8 @@ RUN useradd --system --create-home appuser
 RUN mkdir -p /opt/asn /data \
     && install -m 0644 /tmp/asn-source/app.py /opt/asn/app.py \
     && install -m 0644 /tmp/asn-source/admin.py /opt/asn/admin.py \
+    && install -m 0644 /tmp/asn-source/server_updates.py /opt/asn/server_updates.py \
+    && install -m 0644 /tmp/asn-source/maintenance.py /opt/asn/maintenance.py \
     && install -m 0644 /tmp/asn-source/VERSION /opt/asn/VERSION \
     && chmod 0755 /opt /opt/asn /data \
     && find /opt/asn/web /opt/asn/licenses -type d -exec chmod 0755 {} + \

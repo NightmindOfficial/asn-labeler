@@ -187,6 +187,9 @@ namespace AsnLabeler
             ClientRuntime.DevelopmentMode = args.Contains("--development") || args.Contains("--self-test");
 #endif
             ServicePointManager.SecurityProtocol |= SecurityProtocolType.Tls12;
+#if CLI
+            return HeadlessCli.Run(args);
+#else
             if (args.Length > 0 && args[0] == "--apply-update") return ClientUpdates.Apply(args);
             if (args.Length == 1 && args[0] == "--licenses")
             {
@@ -266,6 +269,7 @@ namespace AsnLabeler
                 do { Loc.Language = AppConfig.Load().Language; using (var form = new MainForm()) { Application.Run(form); restart = form.RestartRequested; } } while (restart);
             }
             return 0;
+#endif
         }
     }
 
@@ -2153,7 +2157,7 @@ namespace AsnLabeler
             Controls.Add(headline);
 
             AddSection("Reservierungsdienst", 58);
-            AddRow(Loc.T("Serveradresse"), serverUrl, 88, "z. B. http://ugreen-nas:8765");
+            AddRow(Loc.T("Serveradresse"), serverUrl, 88, Loc.T("z. B. https://asn.example.org"));
             AddRow("API-Key", apiKey, 146, Loc.T("Geschützt im Windows-Anmeldeinformationsspeicher"));
             demoMode.Text = Loc.T("Demo-Modus");
             demoMode.Font = new Font("Segoe UI", 10, FontStyle.Bold);
@@ -2404,9 +2408,6 @@ namespace AsnLabeler
             place(printer,models,20,304,276,38);
             place(maintenance,resetAsnButton,20,24,570,40);
             place(copies,copyLabelButton,20,24,570,40);
-            place(copies,new Label { Text = Loc.T("Stellvertreterkarte (A4)"), Font = new Font(Font, FontStyle.Bold) },20,104,570,28);
-            place(copies,new Label { Text = Loc.T("Coming Soon"), ForeColor = Color.DimGray },20,140,570,28);
-            place(copies,new Button { Text = Loc.T("Stellvertreterkarte drucken"), Enabled = false },20,180,570,40);
             place(about,new Label { Text = "Paperless ASN Labeler", Font = new Font(Font.FontFamily,14,FontStyle.Bold) },20,20,570,32);
             place(about,new Label { Text = "Version " + AppRelease.Version },20,58,570,24);
             place(about,new Label { Text = Loc.T("ASN-Labels und Stellvertreterlabels für paperless-ngx mit Brother QL-800."), ForeColor = Color.DimGray },20,90,570,44);
@@ -2423,7 +2424,6 @@ namespace AsnLabeler
             var updates = new Button { Text = ClientUpdates.Text("Nach Updates suchen", "Check for updates") };
             updates.Click += delegate { CheckUpdatesRequested = true; Close(); };
             place(about,updates,308,236,282,40);
-            place(about,new Label { Text = Loc.T("Brother b-PAC und Druckertreiber werden separat installiert. Windows-Schriften werden nicht mitgeliefert."), ForeColor = Color.DimGray },20,292,570,52);
             resetProgress.SetBounds(24,488,632,4); Controls.Add(resetProgress);
             foreach (var control in previousControls) if (control.Parent == null) control.Dispose();
         }
@@ -3123,7 +3123,7 @@ namespace AsnLabeler
     sealed class AppConfig
     {
         public bool BpacSetupPrompted;
-        public string ServerUrl = "http://nas.local:8765";
+        public string ServerUrl = "";
         public string DevicePath = "";
         public string PrinterBackend = PrinterBackends.Brother;
         public string PrinterName = "";

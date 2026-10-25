@@ -1,94 +1,106 @@
+<div align="center">
+
 # ASN Labeler
 
-Windows-Client und selbst hostbarer Reservation-Service fuer ASN-Labels in
-paperless-ngx. [Clientversion](windows-app/VERSION) und
-[Serverversion](reservation-service/VERSION) werden unabhaengig gepflegt.
-Release Notes: [Client](windows-app/CHANGELOG.md), [Server](reservation-service/CHANGELOG.md).
+**Print a label. Scan your document. Find it again.**
 
-- DataMatrix-Labels fuer Brother QL-800 ueber den separat installierten b-PAC-Client.
-- Stanz- und Endlosmedien; eigenes Profil fuer PF-B11221-kompatible Rollen.
-- Zentrale ASN-Vergabe, Dokumentenstatus und Web-Administration.
-- Deutscher und englischer Client, Sekundaerlabels und Seriendruck.
+DataMatrix labels for **paperless-ngx**, with a Windows client and a self-hosted reservation service.
 
-## Installation
+[![CI](https://github.com/NightmindOfficial/asn-labeler/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/NightmindOfficial/asn-labeler/actions/workflows/ci.yml)
+[![License: AGPL v3](https://img.shields.io/badge/license-AGPL_v3-176b53?logo=data:image/svg%2Bxml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSJ3aGl0ZSIgc3Ryb2tlLXdpZHRoPSIxLjgiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCI%2BPHBhdGggZD0iTTEyIDN2MThNNyAyMWgxME0zIDdoMThNNiA3bC00IDloOEw2IDdabTEyIDAtNCA5aDhsLTQtOVoiLz48L3N2Zz4%3D)](LICENSE)
+[![Windows x64](https://img.shields.io/badge/client-Windows_x64-0078D4)](#get-started)
+[![Docker](https://img.shields.io/badge/server-self--hosted_Docker-2496ED?logo=docker&logoColor=white)](reservation-service/README.md)
 
-GitHub Actions prueft Pull Requests und veroeffentlicht neue Versionen nach einem
-erfolgreichen Merge nach `main`. Der installierte Client sucht beim Start nach
-Updates und installiert sie nur nach Bestaetigung. Die Compose-Datei baut das Server-Image lokal; alternativ koennen die
-Quelltexte mit den unten beschriebenen Werkzeugen gebaut werden.
+[**Downloads**](https://github.com/NightmindOfficial/asn-labeler/releases) · [**Get started**](#get-started) · [**Documentation**](#documentation) · [**Issues**](https://github.com/NightmindOfficial/asn-labeler/issues)
 
-1. Service: [Einrichtung und Updates](reservation-service/README.md).
-   Das NAS-Paket muss vollstaendig entpackt werden, einschliesslich `web/`,
-   `licenses/`, `tests/` und Build-Skripten. Eigene `.env` und Datenvolume behalten.
-2. Client: `asn-labeler-2.0.0-setup.exe` aus dem Client-Release starten und fuer
-   den aktuellen Benutzer oder alle Benutzer installieren. Brother-Treiber und
-   passendes x64-b-PAC separat installieren; die App verlinkt die offizielle Einrichtung.
-   Serveradresse und Client-API-Key in den Einstellungen setzen.
-3. Paperless: ASN-Barcode-Erkennung aktivieren und DataMatrix-Unterstuetzung
-   pruefen, siehe [Bedienung und Dokumentstatus](docs/USAGE.md). Praefix muss zum Service passen.
+</div>
 
-Es werden keine Brother-Installer oder Treiber mitgeliefert. Die App benoetigt
-Windows x64 mit .NET Framework und b-PAC fuer den echten Druck; kein Python.
-Updates behalten Einstellungen und gespeicherte Zugangsdaten. Unter
-Einstellungen > Ueber kann auch manuell nach Updates gesucht werden.
-Setup ist derzeit unsigniert; Windows kann eine SmartScreen-Warnung anzeigen.
-QL-810W und QL-820NWB sind nur fuer experimentelle USB-Testdrucke und Diagnose
-freigeschaltet, nicht fuer produktive ASN- oder Sekundaerlabel-Auftraege.
+![Windows client with the three-step print workflow and DataMatrix preview](docs/images/client.png)
 
-## Entwicklung
+*Client in demo mode. Screenshots use synthetic data.*
 
-Alle Befehle vom Repository-Hauptverzeichnis aus ausfuehren.
+## From Paper to Paperless
 
-### Windows-Client
+Give paper documents an archive serial number (ASN) before scanning.
+ASN Labeler coordinates the next number, prints its DataMatrix label and tracks
+whether the document has arrived in Paperless. Host the service wherever you
+choose: a home server, VM, cloud host or NAS with Docker.
 
-Der Build nutzt den mit Windows/.NET Framework vorhandenen x64-C#-Compiler.
-ZXing-DLL und Material-Icons-Schrift sind inklusive Lizenzhinweisen vendort;
-der Build prueft ihre SHA-256-Pruefsummen.
+| Print | Keep Track | Stay in Control |
+| --- | --- | --- |
+| Brother QL-800 through its existing driver and b-PAC | Outstanding scans, confirmed imports and uncertain prints | Self-hosted service and web administration |
+| Die-cut and continuous media; PF-B11221-compatible profile | Multiple clients coordinated through SQLite | Separate client/admin keys and explicit recovery |
+| Batches of 1–10, individual cuts and secondary labels | Reconciliation with Paperless | German/English interfaces and optional CLI |
+
+**Sending a print job is not proof of a successful print.** Uncertain results
+remain protected until resolved; the app does not automatically reprint them.
+
+![Web administration with an example document awaiting scanning](docs/images/admin.png)
+
+*Web admin panel with example data. Client and server versions are independent.*
+
+## Get Started
+
+1. **Host the service:** follow the [Docker deployment guide](reservation-service/README.md).
+   Preserve its database volume and `.env` across updates.
+2. **Install the client:** download the installer from a
+   [client release](https://github.com/NightmindOfficial/asn-labeler/releases?q=client-v).
+   Install the Brother driver and official x64 b-PAC separately; the app links
+   to setup resources. Enter the service URL and a client API key.
+3. **Prepare Paperless:** enable ASN recognition and DataMatrix decoding.
+   Follow the [user guide](docs/USAGE.md); the barcode prefix must match.
+4. **Print, attach, scan:** the app checks the service, printer and loaded medium
+   before printing. Follow outstanding scans in the document list.
+
+### Requirements and Limits
+
+- **Windows x64**, .NET Framework, Brother driver and x64 b-PAC. No Python
+  installation needed for the client. Setup is currently unsigned; Windows
+  may show a SmartScreen warning.
+- **QL-800 via local USB.** QL-810W/QL-820NWB are experimental for diagnostics
+  and test prints only, not production ASN printing.
+- **Docker Compose** and a reachable Paperless instance with an API token
+  able to read the relevant documents. Published images target Linux amd64.
+- **One Paperless instance per service.** No document uploads from this app.
+  Brother installers and drivers are not redistributed.
+
+## Prefer the Terminal?
+
+Select the optional CLI in Setup, configure the app once, close it, and open
+a new terminal:
 
 ```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File windows-app/build.ps1
-./windows-app/dist/asn-labeler-test.exe --self-test
-# Lokal interaktiv testen, ohne Installation oder Release:
-./windows-app/dist/asn-labeler-test.exe --development
-# Optional: gepinnten Inno-Setup-Compiler installieren und Setup bauen
-powershell -NoProfile -ExecutionPolicy Bypass -File windows-app/tools/setup-inno.ps1
-powershell -NoProfile -ExecutionPolicy Bypass -File windows-app/build-installer.ps1
+asnlbl help
+asnlbl print -c 3
+asnlbl print -c 3 -s
 ```
 
-### Reservation-Service
+See the [CLI guide](docs/CLI.md) for flags, exit codes and partial-batch handling.
 
-Python 3.12 und die gepinnte Abhaengigkeit Waitress werden fuer Entwicklung benoetigt.
-Tests verwenden Mock-Paperless und temporaere Datenbanken, keinen echten Drucker.
+## Documentation
 
-```powershell
-python -m venv .venv
-./.venv/Scripts/python.exe -m pip install --require-hashes -r reservation-service/requirements.txt
-./.venv/Scripts/python.exe reservation-service/package_source.py --output reservation-service/source.zip
-./.venv/Scripts/python.exe -m unittest discover -s reservation-service/tests
-./.venv/Scripts/python.exe -m unittest discover -s tools/tests
-./.venv/Scripts/python.exe -m unittest discover -s windows-app/tests -p test_release_packaging.py
-```
+| Topic | Guide |
+| --- | --- |
+| Printing and document states | [User guide](docs/USAGE.md) |
+| Hosting, configuration and backups | [Service guide](reservation-service/README.md) |
+| Command line | [CLI guide](docs/CLI.md) |
+| Local builds, tests and contributions | [Contributing](CONTRIBUTING.md) |
+| Releases and compatibility | [Release guide](docs/RELEASING.md) |
+| Changes | [Client](windows-app/CHANGELOG.md) · [Server](reservation-service/CHANGELOG.md) |
+| Reporting vulnerabilities | [Security](SECURITY.md) |
 
-Unter Linux entsprechen diese Befehle `.venv/bin/python`. Docker baut das
-Service-Quellcodearchiv automatisch aus dem Build-Kontext.
+Detailed operating guides are currently in German. Check configuration notes
+before updating; do not replace your `.env` with the example file.
 
-## Dokumentation
+## License and Credits
 
-- [Update- und Release-Ablauf](docs/RELEASING.md)
-- [Versionshistorie](CHANGELOG.md)
-- [Bedienung und Dokumentstatus](docs/USAGE.md)
-- [Server-Einrichtung](reservation-service/README.md)
+Created by [nightmind.dev](https://nightmind.dev).
+[AGPL-3.0-only](LICENSE), with a limited [b-PAC additional permission](LICENSE-BPAC-EXCEPTION.txt)
+for the Windows client. Third-party components retain their
+[respective licenses](THIRD-PARTY-NOTICES.md). Provided without warranty.
 
-## Lizenz
+When distributing binaries, provide corresponding source under the applicable
+license terms. The service exposes licenses, notices and source at
+`/admin/license`, `/admin/notices` and `/admin/source.zip`.
 
-Eigener Code: **AGPL-3.0-only**, siehe [LICENSE](LICENSE) und [NOTICE](NOTICE).
-Der Windows-Client enthaelt die begrenzte [b-PAC-Zusatzerlaubnis](LICENSE-BPAC-EXCEPTION.txt).
-Drittanbieter behalten ihre [eigenen Lizenzen](THIRD-PARTY-NOTICES.md).
-Der Installer verwendet [Inno Setup](windows-app/vendor/InnoSetup/LICENSE.txt).
-Kommerzielle Nutzung ist erlaubt; keine Gewaehrleistung.
-
-Bei Weitergabe der EXE den passenden Quellcode gleichwertig am selben Downloadort
-anbieten. Der Service bietet `/admin/license`, `/admin/notices` und
-`/admin/source.zip` ohne Anmeldung an. Das Archiv enthaelt keine Laufzeitdaten.
-Bei Quellcodeaenderungen neu bauen. Vor oeffentlicher Verteilung bleiben
-Rechte-/Brother-Pruefung und Anbieter-/Datenschutzhinweise zu klaeren.
+Independent community project; not affiliated with Brother or paperless-ngx.

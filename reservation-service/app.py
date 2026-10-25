@@ -11,6 +11,7 @@ import threading
 import time
 import uuid
 import tempfile
+from server_updates import ServerUpdates
 from pathlib import Path
 from collections import OrderedDict, deque
 from contextlib import contextmanager, closing
@@ -38,7 +39,6 @@ CONFIG = {
     "port": int(os.environ.get("PORT", "8765")),
     "reservation_ttl": int(os.environ.get("RESERVATION_TTL_SECONDS", "300")),
     "printing_settle": int(os.environ.get("PRINTING_SETTLE_SECONDS", "30")),
-    "minimum_client_version": os.environ.get("MINIMUM_CLIENT_VERSION", CLIENT_VERSION_FLOOR),
 }
 STATES = {"reserved", "printing", "printed", "reusable", "blocked"}
 TRANSITIONS = {"printing": {"reserved"}, "printed": {"printing"}, "released": {"reserved"}}
@@ -57,7 +57,37 @@ def version_parts(value):
 
 
 def minimum_client_version():
-    return max((CLIENT_VERSION_FLOOR, CONFIG["minimum_client_version"]), key=version_parts)
+    return CLIENT_VERSION_FLOOR
+
+
+class AdmissionBlocked(Exception):
+    def __init__(self, code):
+        self.code = code
+        super().__init__(code)
+
+
+def check_admission(conn):
+    # Called under BEGIN IMMEDIATE: no new work can slip past a policy update
+    # or a maintenance lease between checking and reserving/starting a job.
+    lease = conn.execute("SELECT value FROM metadata WHERE key='update_maintenance_until'").fetchone()
+    if lease and int(lease[0]) > now():
+        raise AdmissionBlocked("service_maintenance")
+    if conn.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='server_update_policy'").fetchone():
+        policy = conn.execute("SELECT minimum FROM server_update_policy WHERE id=1").fetchone()
+        if policy and version_parts(VERSION) < version_parts(policy[0]):
+            raise AdmissionBlocked("server_update_required")
+
+
+UPDATES = None
+UPDATES_LOCK = threading.Lock()
+
+
+def server_updates():
+    global UPDATES
+    with UPDATES_LOCK:
+        if UPDATES is None:
+            UPDATES = ServerUpdates(lambda: closing(db_connect()), VERSION, log)
+        return UPDATES
 
 
 def completes_existing_job(method, path):
@@ -311,6 +341,7 @@ def allocation_number(conn, floor):
 
 def reserve_next():
     with transaction() as conn:
+        check_admission(conn)
         floor = remote_floor(conn, paperless_max_asn())
         expire_reserved(conn, floor)
         number = next_number(conn, floor)
@@ -352,6 +383,7 @@ def transition(reservation_id, target):
         if row["status"] not in TRANSITIONS[target]:
             raise ValueError("Reservation changed; refresh status")
         if target == "printing":
+            check_admission(conn)
             if row["expires_at"] <= now():
                 raise ValueError("Reservation expired; do not print")
             state = "printing"
@@ -679,6 +711,7 @@ def secondary_label(body, confirm=False):
                       "copy_printed", "secondary_label_confirmed")
         else:
             number, document_id = body.get("asnNumber"), body.get("documentId")
+            check_admission(conn)
             if type(number) is not int or type(document_id) is not int or not 1 <= number <= 2147483647 or document_id < 1:
                 raise ValueError("Invalid document identity")
             if existing:
@@ -858,6 +891,7 @@ class ApiRequest:
                 return self.send_json({"ok": True, "version": VERSION, "time": now(),
                     "apiVersion": 1,
                     "minimumClientVersion": minimum_client_version(),
+                    "serverUpdate": server_updates().status(),
                     "capabilities": ["safe-sync-v1", "physical-label-confirmation-v1", "secondary-label-tracking-v1"]})
             admin = path.startswith("/api/admin/") and path != "/api/admin/reset-to-paperless"
             if not self.authorized(admin):
@@ -884,6 +918,17 @@ class ApiRequest:
                     return self.send_json({"error": "Client update required. Install a supported client version.",
                         "errorCode": "client_update_required", "minimumClientVersion": minimum}, 426)
             query = parse_qs(parsed.query)
+            if path == "/api/admin/updates" and method in ("GET", "POST"):
+                self.route = path
+                updates = server_updates()
+                if method == "POST" and time.time() - updates.last_attempt >= 60:
+                    threading.Thread(target=updates.check, daemon=True).start()
+                return self.send_json(updates.status())
+            new_work = (path in ("/api/reservations/next", "/api/documents/copy-labels/start") or
+                        re.fullmatch(r"/api/reservations/[a-zA-Z0-9-]{1,64}/printing", path))
+            if method == "POST" and new_work and server_updates().status()["blocked"]:
+                return self.send_json({"error": "Server security update required. No new print job started.",
+                    "errorCode": "server_update_required", "serverUpdate": server_updates().status()}, 503)
             if method == "GET" and path == "/api/admin/diagnostics":
                 maximum = paperless_max_asn()
                 return self.send_json({"ok": True, "version": VERSION, "paperlessMax": maximum, "checkedAt": now()})
@@ -914,7 +959,8 @@ class ApiRequest:
                 hide_printed = query.get("hide_printed", ["false"])[0]
                 if hide_printed not in ("true", "false"):
                     raise ValueError("hide_printed must be true or false")
-                return self.send_json(admin_state(int(query.get("page", ["1"])[0]), refresh_imports=True, hide_printed=hide_printed == "true"))
+                return self.send_json({**admin_state(int(query.get("page", ["1"])[0]), refresh_imports=True, hide_printed=hide_printed == "true"),
+                    "serverUpdate": server_updates().status()})
             if method == "GET" and path == "/api/admin/events":
                 if query.get("order", [""])[0] == "desc":
                     return self.send_json(recent_admin_events(int(query["before"][0]) if "before" in query else None))
@@ -942,6 +988,9 @@ class ApiRequest:
                     cancel=action.startswith("cancel"), confirm_block=action.endswith("-confirmed"),
                     physical_label_absent=body.get("physicalLabelAbsent") is True))
             self.send_json({"error": "not found"}, 404)
+        except AdmissionBlocked as exc:
+            return self.send_json({"error": "New print jobs are temporarily blocked; no job started.",
+                              "errorCode": exc.code}, 503)
         except KeyError:
             self.send_json({"error": "reservation not found"}, 404)
         except PermissionError:
@@ -1057,7 +1106,7 @@ class BoundedServer(ThreadingHTTPServer):
 
 
 def validate_config():
-    version_parts(CONFIG["minimum_client_version"])
+    version_parts(CLIENT_VERSION_FLOOR)
     if not CONFIG["api_keys"] or any(not 32 <= len(k) <= 512 or k.startswith("replace-") for k in CONFIG["api_keys"] | CONFIG["admin_keys"]):
         raise RuntimeError("API_KEYS required; each client/admin key must be at least 32 characters")
     if CONFIG["api_keys"] & CONFIG["admin_keys"]:
@@ -1078,6 +1127,7 @@ def main():
     validate_config()
     backup_before_migration()
     db_connect().close()
+    server_updates().start()
     log("service_started", version=VERSION, schema=3, ttl=CONFIG["reservation_ttl"],
         minimum_client_version=minimum_client_version(),
         admin_enabled=bool(CONFIG["admin_keys"]), admin_path="/admin/", message="ASN-Service bereit; Paperless wird bei der ersten Abfrage geprueft.")

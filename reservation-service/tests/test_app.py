@@ -3,6 +3,7 @@ import io
 import json
 import os
 import tempfile
+import sys
 import threading
 import unittest
 from unittest import mock
@@ -14,6 +15,7 @@ from concurrent.futures import ThreadPoolExecutor
 
 
 APP_PATH = os.path.join(os.path.dirname(__file__), "..", "app.py")
+sys.path.insert(0, os.path.dirname(os.path.abspath(APP_PATH)))
 
 
 def load_app(db_path):

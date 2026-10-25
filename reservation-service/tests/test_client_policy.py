@@ -13,7 +13,7 @@ class ClientPolicyTests(unittest.TestCase):
         self.folder = tempfile.TemporaryDirectory()
         self.addCleanup(self.folder.cleanup)
         self.app = load_app(os.path.join(self.folder.name, "db"))
-        self.app.CONFIG.update(admin_keys={"admin"}, minimum_client_version="2.0.0")
+        self.app.CONFIG.update(admin_keys={"admin"})
 
     def call(self, path, version=None, key="secret", method="GET", api="1"):
         env = {"REQUEST_METHOD": method, "PATH_INFO": path, "wsgi.input": io.BytesIO(),
@@ -24,10 +24,10 @@ class ClientPolicyTests(unittest.TestCase):
         body = self.app.wsgi_app(env, lambda status, headers: statuses.append(int(status.split()[0])))
         return statuses[0], json.loads(body[0])
 
-    def test_health_advertises_floor_and_configured_security_minimum(self):
+    def test_health_advertises_embedded_minimum_ignoring_legacy_config(self):
         self.assertEqual(self.call("/health", key="")[1]["minimumClientVersion"], "2.0.0")
         self.app.CONFIG["minimum_client_version"] = "2.1.3"
-        self.assertEqual(self.call("/health", key="")[1]["minimumClientVersion"], "2.1.3")
+        self.assertEqual(self.call("/health", key="")[1]["minimumClientVersion"], "2.0.0")
         self.app.CONFIG["minimum_client_version"] = "1.0.0"
         self.assertEqual(self.call("/health")[1]["minimumClientVersion"], "2.0.0")
 
@@ -56,7 +56,7 @@ class ClientPolicyTests(unittest.TestCase):
         self.assertEqual(status, 200)
         path = "/api/reservations/" + row["reservationId"]
         self.assertEqual(self.call(path + "/printing", "2.0.0", method="POST")[0], 200)
-        self.app.CONFIG["minimum_client_version"] = "2.0.1"
+        self.app.CLIENT_VERSION_FLOOR = "2.0.1"
         self.app.CONFIG["api_keys"].add("other")
         self.assertEqual(self.call(path + "/printed", "2.0.0", "other", "POST")[0], 403)
         self.assertEqual(self.call(path + "/printed", "2.0.0", method="POST")[0], 200)
@@ -66,7 +66,7 @@ class ClientPolicyTests(unittest.TestCase):
     def test_unsupported_client_can_only_release_never_started_own_reservation(self):
         with mock.patch.object(self.app, "paperless_max_asn", return_value=0):
             _, row = self.call("/api/reservations/next", "2.0.0", method="POST")
-            self.app.CONFIG["minimum_client_version"] = "2.1.0"
+            self.app.CLIENT_VERSION_FLOOR = "2.1.0"
             self.assertEqual(self.call("/api/reservations/" + row["reservationId"] + "/release", "2.0.0", method="POST")[0], 200)
 
     def test_secondary_confirmation_exception_is_exact(self):
@@ -78,6 +78,6 @@ class ClientPolicyTests(unittest.TestCase):
 
     def test_invalid_policy_is_rejected(self):
         for value in ("", "2.0", "65535.0.0", "1.2.3\n"):
-            self.app.CONFIG["minimum_client_version"] = value
+            self.app.CLIENT_VERSION_FLOOR = value
             with self.assertRaises(ValueError):
                 self.app.validate_config()

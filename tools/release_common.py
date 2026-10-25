@@ -42,7 +42,7 @@ def asset_names(version, component="client"):
         binary = f"asn-labeler-{version}-setup.exe" if version_tuple(version) >= (2, 0, 0) else "asn-labeler.exe"
         return [binary, f"asn-labeler-{version}-source.zip"]
     if component == "server":
-        return [f"asn-reservation-{version}-nas.zip"]
+        return [f"asn-reservation-{version}-nas.zip"] + (["server-update-policy.json"] if version_tuple(version) >= (2, 1, 0) else [])
     raise ValueError("Unknown component")
 
 

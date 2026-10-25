@@ -31,4 +31,14 @@ th,.status,td button{white-space:nowrap}
 .copy-marker{display:inline-flex;align-items:center;gap:3px;margin-left:8px;color:#126752;font-size:13px;white-space:nowrap;vertical-align:middle}
 .copy-marker .material-icon{font-size:16px}
 .copy-marker:focus-visible{outline:2px solid #126752;outline-offset:3px}
+body{min-height:100dvh;display:flex;flex-direction:column;padding-bottom:var(--footer-height,110px)}
+main{flex:1}
+footer{position:fixed;bottom:0;left:0;right:0;z-index:11;background:#fff;align-items:center;gap:8px 16px;padding-top:14px;padding-bottom:14px}
+footer a{color:#126752;text-decoration:underline;text-decoration-color:#b3cfc5;text-underline-offset:4px;text-decoration-thickness:1px;border-radius:2px}
+footer a:hover{color:#084b3b;text-decoration-color:currentColor}
+footer a:focus-visible{outline:2px solid #126752;outline-offset:4px}
+#serverUpdateNotice{padding:12px 16px;border-left:4px solid #9b570e;background:#fff7e6;overflow-wrap:anywhere}
+#serverUpdateNotice.error{border-color:#bd4434;background:#fff0ee;color:#7c211b}
+#serverUpdateNotice a{color:inherit;text-underline-offset:3px}
+#reconnected{bottom:calc(var(--footer-height,110px) + 12px)}
 @media(max-width:650px){header{flex-wrap:wrap}.header-actions{margin-left:auto}.header-buttons{flex-wrap:wrap;justify-content:flex-end}}

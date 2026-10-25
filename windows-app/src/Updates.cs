@@ -195,7 +195,13 @@ namespace AsnLabeler
             foreach (var scope in new[] { "user", "machine" })
                 using (var hive = RegistryKey.OpenBaseKey(scope == "user" ? RegistryHive.CurrentUser : RegistryHive.LocalMachine, RegistryView.Registry64))
                 using (var key = hive.OpenSubKey(@"Software\nightmind.dev\AsnLabeler"))
-                    if (key != null && String.Equals(folder, Convert.ToString(key.GetValue("InstallPath")), StringComparison.OrdinalIgnoreCase)) return scope;
+                    if (key != null)
+                    {
+                        string installed = Convert.ToString(key.GetValue("InstallPath"));
+                        if (String.Equals(folder, installed, StringComparison.OrdinalIgnoreCase) ||
+                            (!String.IsNullOrEmpty(installed) && String.Equals(Path.GetFileName(executable), "asnlbl.exe", StringComparison.OrdinalIgnoreCase) &&
+                             String.Equals(folder, Path.Combine(installed, "cli"), StringComparison.OrdinalIgnoreCase))) return scope;
+                    }
             return null;
         }
         public static void PrepareInstall(string path, string hash)
