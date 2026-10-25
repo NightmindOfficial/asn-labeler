@@ -141,7 +141,8 @@ Adminpanel und Service gehören zusammen: Veraltete Adminseiten müssen nach
 Server-Updates neu geladen werden. Das ist keine Client-Versionssperre.
 
 Ab Client 2.0 einmalig Setup installieren. Danach sucht der Client beim Start
-nach Updates (maximal einmal pro Stunde); manuell unter Einstellungen > Über.
+nach Updates (ab 2.1.1 bei jedem Start, ohne gespeicherte Einstunden-Sperre);
+manuell unter Einstellungen > Über.
 Download und Installation erfordern Bestätigung. Während Druckaufträgen wird
 kein Update angeboten. Setup startet nach dem Beenden der App und behält den
 Installationsmodus sowie Einstellungen/Zugangsdaten. Die Prüfsumme sichert die
@@ -153,6 +154,40 @@ und Client prüfen. Details stehen in der Service-Anleitung.
 Migrationen und Kompatibilität in Release Notes beachten; Hardwaretests bleiben lokal.
 
 ## Konfiguration bei jedem Update
+
+### Sicherheitsrichtlinie ab 2.1.1
+
+`security/policy.json` ist ein signierter Umschlag (RSA/SHA-256) mit Schema,
+aufsteigender Revision, Client-/Server-Mindestversion und Begründung. Er wird
+unabhängig vom Release über den offiziellen `main`-Branch abgerufen.
+Die privaten Signaturschlüssel gehören niemals ins Repository oder in CI-Artefakte.
+Den lokalen Schlüssel separat sicher sichern: Ohne ihn lassen sich keine neuen
+Richtlinien für bereits installierte Clients und Server signieren.
+
+Neue Richtlinie lokal erstellen, Diff prüfen und separat veröffentlichen:
+
+```powershell
+./tools/sign-security-policy.ps1 -Revision 2 -MinimumClient 2.1.1 -MinimumServer 2.0.0 -Reason "Begründung"
+```
+
+Revisionen müssen steigen, Mindestversionen dürfen nicht sinken. Nur tatsächlich
+betroffene Komponenten sperren. Client und Server prüfen vor der Aktivierung,
+ob die verlangten stabilen Releases (beim Client samt Installer) existieren.
+Ein unbekannter Stand bleibt erlaubt; eine verifizierte Sperre bleibt auch
+offline erhalten. Das ist ein Schutz für unveränderte Installationen, kein DRM:
+Wer den Quellcode verändert, kann die Prüfung entfernen.
+
+Für die Einführung zuerst Client 2.1.1 veröffentlichen und installieren, dann
+Server 2.1.1. Der neue Server lehnt ältere Clients bereits durch seine eingebaute
+Untergrenze ab. Server 2.1.0 und ältere Clients können die neue zentrale
+Prüfung nicht rückwirkend erhalten. Bei einem reinen Richtlinien-Update ist
+kein Versions-Bump nötig; die erforderlichen korrigierten Releases müssen vorher
+bereitstehen. Server/Client werden weiterhin unabhängig versioniert.
+
+Nach erfolgreichem Client-Release ergänzt die Pipeline betroffene alte
+Client-Releases um einen Updatehinweis und einen Link zu 2.1.1. Tags,
+Quellarchive und Installer bleiben erhalten; es werden keine Assets gelöscht.
+Das eigene Source-ZIP bleibt notwendig für die zusätzlich enthaltenen Quellen.
 
 Jeder Release und jede Übergabe benennt ausdrücklich, ob sich `.env` ändert.
 Bei Änderungen: betroffene Variablen, alte/neue Defaults, erforderliche Schritte

@@ -96,7 +96,7 @@ class ReservationTests(unittest.TestCase):
                 with self.assertRaises(HTTPError) as exc:
                     request.urlopen(request.Request(url, method="POST"), timeout=3)
                 self.assertEqual(exc.exception.code, 401)
-                req = request.Request(url, method="POST", data=b'{"physicalLabelAbsent":true}', headers={"Authorization": "Bearer secret", "X-ASN-Client-Version": "2.0.0"})
+                req = request.Request(url, method="POST", data=b'{"physicalLabelAbsent":true}', headers={"Authorization": "Bearer secret", "X-ASN-Client-Version": "2.1.1"})
                 with mock.patch.object(app, "paperless_max_asn", return_value=0), mock.patch.object(app, "paperless_documents", return_value={"results": []}):
                     with request.urlopen(req, timeout=3) as response:
                         self.assertEqual(json.load(response)["status"], "next")
@@ -231,7 +231,7 @@ class ReservationTests(unittest.TestCase):
             try:
                 with self.assertRaises(HTTPError) as exc: request.urlopen(url, timeout=3)
                 self.assertEqual(exc.exception.code, 401)
-                req = request.Request(url, headers={"Authorization": "Bearer secret", "X-ASN-Client-Version": "2.0.0"})
+                req = request.Request(url, headers={"Authorization": "Bearer secret", "X-ASN-Client-Version": "2.1.1"})
                 with mock.patch.object(app, "paperless_max_asn", return_value=0):
                     with request.urlopen(req, timeout=3) as response:
                         self.assertEqual(json.load(response)["pending"], 0)
@@ -389,7 +389,7 @@ class ReservationTests(unittest.TestCase):
             thread = threading.Thread(target=server.serve_forever, daemon=True)
             thread.start()
             url = f"http://127.0.0.1:{server.server_port}/api/reservations/next"
-            req = request.Request(url, method="POST", headers={"Authorization": "Bearer secret", "X-ASN-Client-Version": "2.0.0"})
+            req = request.Request(url, method="POST", headers={"Authorization": "Bearer secret", "X-ASN-Client-Version": "2.1.1"})
             try:
                 with mock.patch.object(app, "paperless_max_asn", return_value=9):
                     with request.urlopen(req, timeout=3) as resp:
@@ -412,7 +412,7 @@ class ReservationTests(unittest.TestCase):
                     request.urlopen(request.Request(url, method="GET"), timeout=3)
                 self.assertEqual(ctx.exception.code, 401)
 
-                req = request.Request(url, method="GET", headers={"Authorization": "Bearer secret", "X-ASN-Client-Version": "2.0.0"})
+                req = request.Request(url, method="GET", headers={"Authorization": "Bearer secret", "X-ASN-Client-Version": "2.1.1"})
                 with mock.patch.object(app, "paperless_max_asn", return_value=6):
                     with request.urlopen(req, timeout=3) as resp:
                         self.assertEqual(resp.status, 200)
@@ -434,7 +434,7 @@ class ReservationTests(unittest.TestCase):
                     request.urlopen(request.Request(url, method="POST"), timeout=3)
                 self.assertEqual(ctx.exception.code, 401)
 
-                req = request.Request(url, method="POST", headers={"Authorization": "Bearer secret", "X-ASN-Client-Version": "2.0.0"})
+                req = request.Request(url, method="POST", headers={"Authorization": "Bearer secret", "X-ASN-Client-Version": "2.1.1"})
                 with mock.patch.object(app, "paperless_max_asn", return_value=12):
                     with request.urlopen(req, timeout=3) as resp:
                         self.assertEqual(resp.status, 200)

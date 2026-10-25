@@ -25,6 +25,9 @@ namespace AsnLabeler
             try
             {
                 ClientRuntime.RequireInstallation();
+                ClientUpdates.CheckSafety();
+                if (ClientRuntime.UpdateRequired)
+                { Write(Console.Error, new { error = "client_update_required", minimumVersion = ClientRuntime.EffectiveMinimum }); return 2; }
                 Mutex setup;
                 if (Mutex.TryOpenExisting("Global\\AsnLabelerSetup", out setup))
                 { setup.Dispose(); Write(Console.Error, new { error = "setup_running" }); return 3; }

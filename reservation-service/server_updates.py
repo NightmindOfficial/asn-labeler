@@ -5,6 +5,7 @@ import threading
 import time
 from urllib import request
 from urllib.parse import urlsplit
+from security_policy import POLICY_URL, fetch_policy
 
 REPOSITORY = "NightmindOfficial/asn-labeler"
 IMAGE = "ghcr.io/nightmindofficial/asn-reservation"
@@ -20,6 +21,8 @@ def version(value):
 
 
 def allowed_url(url):
+    if url == POLICY_URL:
+        return True
     parsed = urlsplit(url)
     if parsed.scheme != "https" or parsed.port not in (None, 443) or parsed.username or parsed.password:
         return False
@@ -87,15 +90,44 @@ class ServerUpdates:
             conn.execute("""CREATE TABLE IF NOT EXISTS server_update_policy (
                 id INTEGER PRIMARY KEY CHECK(id=1), minimum TEXT NOT NULL,
                 latest TEXT NOT NULL, checked_at INTEGER NOT NULL)""")
+            conn.execute("""CREATE TABLE IF NOT EXISTS security_policy (
+                id INTEGER PRIMARY KEY CHECK(id=1), revision INTEGER NOT NULL,
+                client_minimum TEXT NOT NULL, server_minimum TEXT NOT NULL, reason TEXT NOT NULL)""")
+
+    def client_minimum(self):
+        with self.connect() as conn:
+            row = conn.execute("SELECT client_minimum FROM security_policy WHERE id=1").fetchone()
+        return row[0] if row else "2.0.0"
+
+    def check_security(self, fetch=fetch_json):
+        try:
+            policy = fetch_policy(fetch)
+            with self.connect() as conn:
+                conn.execute("BEGIN IMMEDIATE")
+                old = conn.execute("SELECT revision,client_minimum,server_minimum FROM security_policy WHERE id=1").fetchone()
+                if old and (policy["revision"] <= old[0] or version(policy["minimumClientVersion"]) < version(old[1]) or version(policy["minimumServerVersion"]) < version(old[2])):
+                    return
+                conn.execute("INSERT OR REPLACE INTO security_policy VALUES(1,?,?,?,?)", (policy["revision"], policy["minimumClientVersion"], policy["minimumServerVersion"], policy["reason"]))
+                conn.commit()
+            self.log("security_policy_checked", revision=policy["revision"])
+        except Exception as exc:
+            self.log("security_policy_check_failed", kind=type(exc).__name__)
 
     def status(self):
         with self.connect() as conn:
             row = conn.execute("SELECT minimum,latest,checked_at FROM server_update_policy WHERE id=1").fetchone()
         minimum, latest, checked = tuple(row) if row else (None, None, None)
+        with self.connect() as conn:
+            central = conn.execute("SELECT server_minimum,client_minimum,revision,reason FROM security_policy WHERE id=1").fetchone()
+        if central:
+            minimum = max(filter(None, (minimum, central[0])), key=version)
         blocked = bool(minimum and version(self.current) < version(minimum))
         with self.lock:
             error, attempted = self.error, self.last_attempt
         return {"currentVersion": self.current, "latestVersion": latest, "minimumSafeServerVersion": minimum,
+                "minimumSafeClientVersion": central[1] if central else None,
+                "securityPolicyRevision": central[2] if central else None,
+                "securityReason": central[3] if central else None,
                 "blocked": blocked, "updateAvailable": bool(latest and version(latest) > version(self.current)),
                 "checkedAt": checked, "lastAttempt": attempted, "checkFailed": bool(error),
                 "state": "blocked" if blocked else "unknown" if not row else "update_available" if version(latest) > version(self.current) else "current",
@@ -127,9 +159,13 @@ class ServerUpdates:
             self.check_lock.release()
         return self.status()
 
+    def refresh(self):
+        self.check_security()
+        return self.check()
+
     def start(self):
         def worker():
             while True:
-                self.check()
+                self.refresh()
                 time.sleep(3600)
         threading.Thread(target=worker, name="server-update-check", daemon=True).start()

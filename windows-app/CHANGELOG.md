@@ -1,5 +1,16 @@
 # Client Changelog
 
+## 2.1.1
+
+- Unabhängige, RSA-signierte GitHub-Sicherheitsrichtlinie beim Start und bei manueller Updateprüfung; CLI prüft vor dem Drucken. Verifizierte Sperren bleiben offline erhalten und können nicht durch eine ältere Richtlinie oder Serverantwort aufgehoben werden.
+- Gesperrte Clients können keine neuen Druckaufträge starten; Bestätigungen laufender Aufträge sowie Update und Diagnose bleiben verfügbar.
+
+- Update-Download: Windows-Herkunftsmarkierung über nativen Dateizugriff schreiben; behebt den Pfadformatfehler von .NET Framework, ohne die Internet-Zonenmarkierung zu entfernen.
+- Update-Prüfung bei jedem App-Start, ohne gespeicherte Einstunden-Sperre. Manuelle Prüfung bleibt möglich.
+- Für den Wechsel von 2.0.0/2.1.0 mit betroffenem Updater den neuen Setup-Installer einmal direkt aus dem GitHub-Release herunterladen und ausführen. Keine vorherige Deinstallation nötig.
+
+- Hosting-neutrale Beispieladresse im Einstellungs-Selbsttest. Keine Änderung am Druck- oder API-Verhalten.
+
 ## 2.1.0
 
 - Oberfläche bereinigt: A4-Platzhalter und doppelte Hinweise entfernt; neue

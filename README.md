@@ -24,7 +24,7 @@ DataMatrix labels for **paperless-ngx**, with a Windows client and a self-hosted
 Give paper documents an archive serial number (ASN) before scanning.
 ASN Labeler coordinates the next number, prints its DataMatrix label and tracks
 whether the document has arrived in Paperless. Host the service wherever you
-choose: a home server, VM, cloud host or NAS with Docker.
+choose: any suitable Docker host, locally or in the cloud.
 
 | Print | Keep Track | Stay in Control |
 | --- | --- | --- |

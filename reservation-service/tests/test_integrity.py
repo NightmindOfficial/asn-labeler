@@ -310,7 +310,7 @@ class HttpIntegrityTests(unittest.TestCase):
     def call(self, path, method="GET", body=None, key="secret"):
         req = request.Request(self.base + path, method=method,
             data=None if body is None else json.dumps(body).encode(),
-            headers={"Authorization": "Bearer " + key, "X-ASN-Client-Version": "2.0.0"})
+            headers={"Authorization": "Bearer " + key, "X-ASN-Client-Version": "2.1.1"})
         try:
             with request.urlopen(req, timeout=3) as response:
                 return response.status, json.load(response), response.headers
@@ -342,7 +342,7 @@ class HttpIntegrityTests(unittest.TestCase):
 
     def test_malformed_payload_and_unknown_routes(self):
         req = request.Request(self.base + "/api/reservations/next", method="POST", data=b"{bad",
-                              headers={"Authorization": "Bearer secret", "X-ASN-Client-Version": "2.0.0"})
+                              headers={"Authorization": "Bearer secret", "X-ASN-Client-Version": "2.1.1"})
         with self.assertRaises(HTTPError) as exc:
             request.urlopen(req, timeout=3)
         self.assertEqual(exc.exception.code, 409)

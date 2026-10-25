@@ -5,6 +5,8 @@ $ErrorActionPreference = "Stop"
 $root = Split-Path -Parent $MyInvocation.MyCommand.Path
 $project = Split-Path -Parent $root
 $licenseResources = @(
+    "/resource:$project\reservation-service\policy-key.json,AsnLabeler.PolicyKey",
+    "/resource:$project\security\policy.json,AsnLabeler.PolicyFixture",
     "/resource:$project\LICENSE,AsnLabeler.LICENSE",
     "/resource:$project\NOTICE,AsnLabeler.NOTICE",
     "/resource:$project\LICENSE-BPAC-EXCEPTION.txt,AsnLabeler.BpacPermission",

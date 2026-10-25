@@ -115,6 +115,32 @@ def publish(api, directory, version, commit, notes, names, component="client"):
     return "published"
 
 
+def warn_obsolete_clients(api, minimum="2.1.1"):
+    replacement = find_release(api, "client-v" + minimum)
+    if not replacement or replacement["draft"] or replacement.get("prerelease"):
+        return
+    if not any(a.get("name") == "asn-labeler-" + minimum + "-setup.exe" for a in replacement.get("assets", [])):
+        return
+    marker = "<!-- unsupported-client-update-path -->"
+    warning = (marker + "\n> **Unsupported client: install version " + minimum + " or newer.**\n"
+               "> The built-in updater in this version cannot complete installation. Download and run the "
+               "[replacement installer](https://github.com/NightmindOfficial/asn-labeler/releases/tag/client-v" + minimum + ") manually; no uninstall is needed.\n\n")
+    for page in range(1, 21):
+        releases = api.request("GET", "/releases?per_page=100&page=" + str(page))
+        for release in releases:
+            tag = release.get("tag_name", "")
+            if release.get("draft") or not re.fullmatch(r"client-v\d+\.\d+\.\d+", tag):
+                continue
+            if tuple(map(int, tag[8:].split("."))) >= tuple(map(int, minimum.split("."))):
+                continue
+            body = release.get("body") or ""
+            if marker not in body:
+                api.request("PATCH", "/releases/" + str(release["id"]), {"body": warning + body})
+        if len(releases) < 100:
+            return
+    raise ValueError("Release warning pagination limit reached")
+
+
 def main():
     if os.environ.get("GITHUB_REF") != "refs/heads/main" or os.environ.get("GITHUB_EVENT_NAME") not in ("push", "workflow_dispatch"):
         raise ValueError("Publishing is allowed only from a main-branch workflow")
@@ -127,6 +153,8 @@ def main():
     notes = release_notes((ROOT / COMPONENTS[component] / "CHANGELOG.md").read_text(encoding="utf-8"), version)
     api = GitHub(os.environ["GITHUB_REPOSITORY"], os.environ["GITHUB_TOKEN"])
     publish(api, directory, version, commit, notes, names, component)
+    if component == "client":
+        warn_obsolete_clients(api)
 
 
 if __name__ == "__main__":

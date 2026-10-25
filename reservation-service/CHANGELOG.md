@@ -1,11 +1,20 @@
 # Server Changelog
 
+## 2.1.1
+
+- Mindest-Clientversion 2.1.1: ältere Clients mit defektem Updater müssen einmal manuell aktualisiert werden. Bestehende Druckbestätigungen bleiben möglich.
+- Release-unabhängige, signierte Sicherheitsrichtlinie von GitHub für Client- und Server-Mindestversionen. Prüfung beim Start und stündlich; bekannte Sperren bleiben offline und nach Neustart erhalten. Neue Arbeit wird transaktional gesperrt, ohne bestehende ASNs freizugeben.
+- Keine zusätzlichen `.env`-Variablen für die Sicherheitsrichtlinie. SQLite erhält automatisch eine zusätzliche Tabelle; bestehende Reservierungen bleiben unverändert.
+
+- Hosting-neutrale Paketnamen und Dokumentation: `asn-reservation-2.1.1.zip`.
+- `.env`-Migration beim Austausch der Compose-Dateien: bisherigen Bind-Adressenschlüssel in `HOST_BIND_IP` umbenennen, Wert beibehalten. Standard bleibt `127.0.0.1`. Reine Image-Updates ändern bestehende Compose-Konfigurationen nicht.
+
 ## 2.1.0
 
 - Persistente Sicherheitsprüfung gegen die offizielle GitHub-Release-Richtlinie; bekannte unsichere Server sperren neue Reservierungen und Druckstarts, nicht deren Bestätigung.
 - Unbekannter Sicherheitsstand oder GitHub-Ausfall erzeugt keine neue Sperre; bereits bekannte Mindeststände bleiben erhalten.
 - Mindest-Clientversion außchließlich im Release festgelegt; alte Env-Überschreibung entfällt.
-- Getestetes Docker-Image in GHCR, Registry-Compose und ausdrücklich aktivierbarer NAS-Updater mit Druckruhe-Prüfung, Wartungslease und SQLite-Backup.
+- Getestetes Docker-Image in GHCR, Registry-Compose und ausdrücklich aktivierbarer Host-Updater mit Druckruhe-Prüfung, Wartungslease und SQLite-Backup.
 - Adminfooter fest am unteren Fensterrand, gestaltete Links inklusive nightmind.dev.
 - Wiederverbindungsversuche enden nach zwei Minuten; danach ist manuelles Neuladen erforderlich.
 

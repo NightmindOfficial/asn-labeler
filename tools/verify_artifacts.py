@@ -44,10 +44,10 @@ def verify_server(directory, version):
         policy = json.loads((directory / "server-update-policy.json").read_text(encoding="utf-8"))
         if policy.get("schema") != 1 or policy.get("version") != version or version_tuple(policy["minimumSafeServerVersion"]) > version_tuple(version):
             raise ValueError("Invalid server update policy")
-    with ZipFile(directory / f"asn-reservation-{version}-nas.zip") as archive:
+    with ZipFile(directory / asset_names(version, "server")[0]) as archive:
         validate_archive(archive, ["VERSION", "Dockerfile", "app.py", "README.md", "source.zip", "licenses/LICENSE"])
         if archive.read("VERSION").decode().strip() != version:
-            raise ValueError("NAS package version mismatch")
+            raise ValueError("Server package version mismatch")
         if version_tuple(version) >= (2, 1, 0) and json.loads(archive.read("release-policy.json")) != policy:
             raise ValueError("Published policy differs from deployment source")
         with ZipFile(io.BytesIO(archive.read("source.zip"))) as source:

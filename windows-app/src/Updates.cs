@@ -1,11 +1,13 @@
 using System;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.Diagnostics;
 using System.Drawing;
 using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Net;
+using System.Runtime.InteropServices;
 using System.Security.Cryptography;
 using System.Text;
 using System.Threading;
@@ -13,6 +15,7 @@ using System.Threading.Tasks;
 using System.Web.Script.Serialization;
 using System.Windows.Forms;
 using Microsoft.Win32;
+using Microsoft.Win32.SafeHandles;
 
 namespace AsnLabeler
 {
@@ -20,7 +23,9 @@ namespace AsnLabeler
     {
         internal static bool DevelopmentMode = false;
         internal static string RequiredVersion;
-        internal static bool UpdateRequired { get { return !String.IsNullOrEmpty(Volatile.Read(ref RequiredVersion)); } }
+        internal static string SecurityMinimum;
+        internal static string EffectiveMinimum { get { return new[] { RequiredVersion, SecurityMinimum }.Where(v => !String.IsNullOrEmpty(v)).OrderByDescending(v => v == "?" ? new Version(65534,65534,65534) : ClientUpdates.ParseVersion(v)).FirstOrDefault(); } }
+        internal static bool UpdateRequired { get { return !String.IsNullOrEmpty(EffectiveMinimum); } }
         internal static void RequireInstallation()
         {
             if (!DevelopmentMode && ClientUpdates.InstallScope(Application.ExecutablePath) == null)
@@ -49,6 +54,14 @@ namespace AsnLabeler
         public string InstallerName { get { return "asn-labeler-" + VersionText + "-setup.exe"; } }
     }
     sealed class UpdateFile { public string sha256 { get; set; } public long size { get; set; } }
+    sealed class SafetyPolicy
+    {
+        public int schema { get; set; }
+        public int revision { get; set; }
+        public string minimumClientVersion { get; set; }
+        public string minimumServerVersion { get; set; }
+        public string reason { get; set; }
+    }
     sealed class UpdateManifest
     {
         public string component { get; set; }
@@ -63,6 +76,70 @@ namespace AsnLabeler
         internal static string CacheRoot { get { return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "AsnLabeler", "Updates"); } }
         internal static readonly JavaScriptSerializer Json = new JavaScriptSerializer { MaxJsonLength = 4 * 1024 * 1024 };
         static readonly object CheckLock = new object();
+        const string PolicyUrl = "https://raw.githubusercontent.com/NightmindOfficial/asn-labeler/main/security/policy.json";
+        static SafetyPolicy retainedPolicy;
+        static bool safetyChecked;
+        internal static void EnsureSafetyChecked()
+        {
+            lock (CheckLock) { if (!safetyChecked) CheckSafety(); }
+        }
+
+        internal static SafetyPolicy VerifyPolicy(string envelope)
+        {
+            var data = Json.Deserialize<Dictionary<string, string>>(envelope);
+            byte[] payload = Convert.FromBase64String(data["payload"]);
+            if (payload.Length > 16384) throw new InvalidDataException("Security policy too large.");
+            using (var resource = typeof(ClientUpdates).Assembly.GetManifestResourceStream("AsnLabeler.PolicyKey"))
+            using (var reader = new StreamReader(resource))
+            using (var rsa = new RSACryptoServiceProvider())
+            {
+                rsa.PersistKeyInCsp = false;
+                var key = Json.Deserialize<Dictionary<string, string>>(reader.ReadToEnd());
+                rsa.ImportParameters(new RSAParameters { Modulus = Convert.FromBase64String(key["modulus"]), Exponent = Convert.FromBase64String(key["exponent"]) });
+                if (!rsa.VerifyData(payload, CryptoConfig.MapNameToOID("SHA256"), Convert.FromBase64String(data["signature"])))
+                    throw new InvalidDataException("Invalid security policy signature.");
+            }
+            var policy = Json.Deserialize<SafetyPolicy>(Encoding.UTF8.GetString(payload));
+            if (policy.schema != 1 || policy.revision <= 0 || policy.reason == null || policy.reason.Length > 1000) throw new InvalidDataException("Invalid security policy.");
+            ParseVersion(policy.minimumClientVersion); ParseVersion(policy.minimumServerVersion);
+            return policy;
+        }
+        static void RetainPolicy(SafetyPolicy policy)
+        {
+            if (retainedPolicy != null && (policy.revision <= retainedPolicy.revision ||
+                ParseVersion(policy.minimumClientVersion) < ParseVersion(retainedPolicy.minimumClientVersion))) return;
+            retainedPolicy = policy;
+            ClientRuntime.SecurityMinimum = ParseVersion(AppRelease.Version) < ParseVersion(policy.minimumClientVersion) ? policy.minimumClientVersion : null;
+        }
+        internal static void CheckSafety()
+        {
+            lock (CheckLock)
+            {
+                safetyChecked = true;
+                string cache = Path.Combine(CacheRoot, "security-policy.json");
+                try { if (File.Exists(cache)) RetainPolicy(VerifyPolicy(File.ReadAllText(cache))); } catch (Exception) { /* Unknown is not revoked. */ }
+                try
+                {
+                    string envelope = Encoding.UTF8.GetString(GetBytes(PolicyUrl, 32768, null));
+                    var policy = VerifyPolicy(envelope);
+                    foreach (string component in new[] { "client", "server" })
+                    {
+                        string minimum = component == "client" ? policy.minimumClientVersion : policy.minimumServerVersion;
+                        var release = Json.Deserialize<ClientRelease>(Encoding.UTF8.GetString(GetBytes("https://api.github.com/repos/" + Repository + "/releases/tags/" + component + "-v" + minimum, 1024 * 1024, null)));
+                        if (release.draft || release.prerelease || release.tag_name != component + "-v" + minimum ||
+                            (component == "client" && (release.assets == null || !release.assets.Any(a => a.name == "asn-labeler-" + minimum + "-setup.exe"))))
+                            throw new InvalidDataException("Required release not available.");
+                    }
+                    RetainPolicy(policy);
+                    if (retainedPolicy != policy) return;
+                    Directory.CreateDirectory(CacheRoot);
+                    string temporary = cache + ".tmp";
+                    File.WriteAllText(temporary, envelope);
+                    if (File.Exists(cache)) File.Replace(temporary, cache, null); else File.Move(temporary, cache);
+                }
+                catch (Exception) { /* Keep a verified cached restriction when offline. */ }
+            }
+        }
 
         public static string Text(string de, string en) { return Loc.Language == "en" ? en : de; }
         internal static Version ParseVersion(string value)
@@ -81,30 +158,27 @@ namespace AsnLabeler
                 .Where(r => ParseVersion(r.VersionText) > version)
                 .OrderByDescending(r => ParseVersion(r.VersionText)).FirstOrDefault();
         }
-        public static ClientRelease Check(bool manual)
+        public static ClientRelease Check() { CheckSafety(); return Check(LookupRelease); }
+        internal static ClientRelease Check(Func<ClientRelease> lookup)
         {
-            lock (CheckLock)
+            lock (CheckLock) { return lookup(); }
+        }
+        static ClientRelease LookupRelease()
+        {
+            var releases = new List<ClientRelease>();
+            for (int page = 1; page <= 20; page++)
             {
-                Directory.CreateDirectory(CacheRoot);
-                string stamp = Path.Combine(CacheRoot, "last-check.txt");
-                DateTime last;
-                if (!manual && File.Exists(stamp) && DateTime.TryParse(File.ReadAllText(stamp), CultureInfo.InvariantCulture,
-                    DateTimeStyles.RoundtripKind, out last) && DateTime.UtcNow >= last && DateTime.UtcNow - last < TimeSpan.FromHours(1)) return null;
-                File.WriteAllText(stamp, DateTime.UtcNow.ToString("O", CultureInfo.InvariantCulture));
-                var releases = new List<ClientRelease>();
-                for (int page = 1; page <= 20; page++)
-                {
-                    var batch = Json.Deserialize<ClientRelease[]>(Encoding.UTF8.GetString(GetBytes(
-                        "https://api.github.com/repos/" + Repository + "/releases?per_page=100&page=" + page, 4 * 1024 * 1024, null)));
-                    if (batch == null) throw new InvalidDataException("Invalid GitHub response.");
-                    releases.AddRange(batch);
-                    if (batch.Length < 100) return Select(releases, AppRelease.Version);
-                }
-                throw new InvalidDataException("Release lookup limit reached.");
+                var batch = Json.Deserialize<ClientRelease[]>(Encoding.UTF8.GetString(GetBytes(
+                    "https://api.github.com/repos/" + Repository + "/releases?per_page=100&page=" + page, 4 * 1024 * 1024, null)));
+                if (batch == null) throw new InvalidDataException("Invalid GitHub response.");
+                releases.AddRange(batch);
+                if (batch.Length < 100) return Select(releases, AppRelease.Version);
             }
+            throw new InvalidDataException("Release lookup limit reached.");
         }
         internal static bool AllowedUrl(Uri uri)
         {
+            if (uri.AbsoluteUri == PolicyUrl) return true;
             if (uri.Scheme != Uri.UriSchemeHttps || uri.Port != 443 || uri.UserInfo.Length != 0) return false;
             if (uri.Host == "api.github.com") return uri.AbsolutePath.StartsWith("/repos/" + Repository + "/", StringComparison.Ordinal);
             if (uri.Host == "github.com") return uri.AbsolutePath.StartsWith("/" + Repository + "/releases/download/", StringComparison.Ordinal);
@@ -179,10 +253,38 @@ namespace AsnLabeler
                 cancel.ThrowIfCancellationRequested();
                 if (new FileInfo(path).Length != expected.size || Hash(path) != expected.sha256) throw new InvalidDataException("Installer checksum mismatch.");
                 // Preserve Windows' Internet-zone warning for downloaded unsigned setup files.
-                File.WriteAllText(path + ":Zone.Identifier", "[ZoneTransfer]\r\nZoneId=3\r\n");
+                MarkInternetDownload(path);
                 hash = expected.sha256; return path;
             }
             catch { File.Delete(path); throw; }
+        }
+        [DllImport("kernel32.dll", EntryPoint = "CreateFileW", CharSet = CharSet.Unicode, SetLastError = true)]
+        static extern SafeFileHandle CreateFile(string name, uint access, uint share, IntPtr security,
+            uint disposition, uint flags, IntPtr template);
+
+        // .NET Framework's path validation rejects alternate data stream names.
+        static FileStream OpenZoneStream(string path, bool write)
+        {
+            var handle = CreateFile(Path.GetFullPath(path) + ":Zone.Identifier",
+                write ? 0x40000000u : 0x80000000u, 1, IntPtr.Zero,
+                write ? 2u : 3u, 0x80, IntPtr.Zero);
+            if (handle.IsInvalid)
+            {
+                int error = Marshal.GetLastWin32Error();
+                handle.Dispose();
+                throw new Win32Exception(error, Text("Windows-Herkunftsmarkierung konnte nicht geöffnet werden.",
+                    "Could not open the Windows download origin marker."));
+            }
+            try { return new FileStream(handle, write ? FileAccess.Write : FileAccess.Read); }
+            catch { handle.Dispose(); throw; }
+        }
+        internal static void MarkInternetDownload(string path)
+        {
+            using (var stream = OpenZoneStream(path, true))
+            {
+                byte[] data = Encoding.ASCII.GetBytes("[ZoneTransfer]\r\nZoneId=3\r\n");
+                stream.Write(data, 0, data.Length);
+            }
         }
         static string Quote(string path)
         {
@@ -250,6 +352,42 @@ namespace AsnLabeler
         internal static IEnumerable<string> Validate()
         {
             var errors = new List<string>();
+            string envelope;
+            using (var stream = typeof(ClientUpdates).Assembly.GetManifestResourceStream("AsnLabeler.PolicyFixture"))
+            using (var reader = new StreamReader(stream)) envelope = reader.ReadToEnd();
+            var verified = VerifyPolicy(envelope);
+            var tampered = Json.Deserialize<Dictionary<string,string>>(envelope);
+            tampered["payload"] = Convert.ToBase64String(Encoding.UTF8.GetBytes("{}"));
+            try { VerifyPolicy(Json.Serialize(tampered)); errors.Add("Tampered policy accepted."); } catch (InvalidDataException) { }
+            var savedPolicy = retainedPolicy;
+            string savedMinimum = ClientRuntime.SecurityMinimum;
+            try
+            {
+                RetainPolicy(new SafetyPolicy { revision = Int32.MaxValue, minimumClientVersion = "99.0.0" });
+                RetainPolicy(verified);
+                if (ClientRuntime.SecurityMinimum != "99.0.0") errors.Add("Safety floor rollback accepted.");
+                ReservationClient.ValidateCompatibility(new Health { ok = true, minimumClientVersion = "2.0.0" });
+                if (!ClientRuntime.UpdateRequired) errors.Add("Server cleared independent safety restriction.");
+            }
+            finally { retainedPolicy = savedPolicy; ClientRuntime.SecurityMinimum = savedMinimum; }
+            int checks = 0;
+            Func<ClientRelease> lookup = () => { checks++; return null; };
+            Check(lookup); Check(lookup);
+            if (checks != 2) errors.Add("Update checks were throttled across starts.");
+            string download = Path.Combine(Path.GetTempPath(), "ASN update \u00e4 " + Guid.NewGuid().ToString("N") + ".exe");
+            try
+            {
+                File.WriteAllText(download, "test installer");
+                string before = Hash(download);
+                MarkInternetDownload(download);
+                MarkInternetDownload(download);
+                using (var reader = new StreamReader(OpenZoneStream(download, false)))
+                    if (reader.ReadToEnd() != "[ZoneTransfer]\r\nZoneId=3\r\n") errors.Add("Internet zone marker missing or invalid.");
+                if (Hash(download) != before) errors.Add("Origin marking changed installer bytes.");
+                try { MarkInternetDownload(Path.Combine(download, "missing.exe")); errors.Add("Origin marking error was ignored."); }
+                catch (Win32Exception) { }
+            }
+            finally { File.Delete(download); }
             var releases = new[] {
                 new ClientRelease { tag_name = "server-v99.0.0" }, new ClientRelease { tag_name = "client-v9.0.0", draft = true },
                 new ClientRelease { tag_name = "client-v8.0.0", prerelease = true }, new ClientRelease { tag_name = "client-v2.0.1" },

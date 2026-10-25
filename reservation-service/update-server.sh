@@ -1,5 +1,5 @@
 #!/bin/sh
-# Run from the NAS project directory. No automatic updates without --apply.
+# Run from the Compose project directory. No automatic updates without --apply.
 set -eu
 if [ "$#" -lt 1 ] || [ "$#" -gt 2 ]; then
   echo 'Usage: sh update-server.sh EXISTING_COMPOSE_PROJECT [--apply]' >&2
