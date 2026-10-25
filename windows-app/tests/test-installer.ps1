@@ -52,7 +52,6 @@ try {
     $mutex = [Threading.Mutex]::new($false, 'Global\AsnLabelerRunning')
     try { if ((Run-Setup) -eq 0) { throw 'Setup ignored the running-application guard.' } }
     finally { $mutex.Dispose() }
-    Write-Host 'Installer install, reinstall, version and running-application guard passed.'
 } finally {
     $uninstaller = Join-Path $destination 'unins000.exe'
     if (Test-Path $uninstaller) {
@@ -60,5 +59,8 @@ try {
         if ($p.ExitCode -ne 0) { throw 'Uninstall failed.' }
     }
 }
+# Final checks must pass before clearing the expected CLI failure exit code.
 if (Test-Path $registry) { throw 'Uninstall registration was not removed.' }
 if ((Read-Path).TrimEnd(';') -cne $pathBefore.TrimEnd(';')) { throw 'Uninstall altered unrelated PATH entries.' }
+Write-Host 'Installer install, reinstall, version, running-application guard and uninstall passed.'
+exit 0
