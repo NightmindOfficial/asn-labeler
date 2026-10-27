@@ -24,6 +24,11 @@ namespace AsnLabeler
 {
     static class ThirdPartyLicenses
     {
+        public static string ReadChangelog()
+        {
+            using (var stream = typeof(ThirdPartyLicenses).Assembly.GetManifestResourceStream("AsnLabeler.Changelog"))
+            using (var reader = new StreamReader(stream)) return reader.ReadToEnd();
+        }
         public static string Read()
         {
             var text = new StringBuilder("ZXing.Net 0.16.11 - Copyright Michael Jahn and ZXing contributors\r\nhttps://github.com/micjahn/ZXing.Net\r\nApache License 2.0; unmodified assembly\r\n\r\nMaterial Icons - Google\r\nhttps://github.com/google/material-design-icons\r\nApache License 2.0; unmodified font\r\n\r\n");
@@ -373,6 +378,7 @@ namespace AsnLabeler
         readonly Label heroNextAsn = new Label();
         readonly Label printerDetail = new Label();
         readonly Label serverDetail = new Label();
+        readonly Label serverVersionLabel = new Label();
         readonly Label previewDetail = new Label();
         readonly PictureBox preview = new PictureBox();
         readonly ProgressBar activity = new ProgressBar();
@@ -530,6 +536,9 @@ namespace AsnLabeler
             serverDetail.ForeColor = Color.FromArgb(75, 85, 99);
             serverDetail.Text = Loc.T("Prüft API und nächste ASN.");
             serverDetail.Font = UiFont(10, FontStyle.Regular);
+            serverVersionLabel.Font = UiFont(10, FontStyle.Regular);
+            serverVersionLabel.ForeColor = Color.FromArgb(75, 85, 99);
+            serverVersionLabel.AutoEllipsis = true;
             serverDetail.AutoEllipsis = true;
 
             serverStatus.Font = UiFont(10, FontStyle.Bold);
@@ -561,6 +570,7 @@ namespace AsnLabeler
             serverStep.Controls.Add(testServerButton);
             serverStep.Controls.Add(serverStatus);
             serverStep.Controls.Add(serverDetail);
+            serverStep.Controls.Add(serverVersionLabel);
             serverStep.Controls.Add(heroNextAsn);
 
             previewStep.Controls.Add(previewDetail);
@@ -1175,7 +1185,8 @@ namespace AsnLabeler
             Place(refreshNextButton, 216, 102, 180, 32);
             Place(serverStatus, 62, 68, 124, 24);
             serverStatus.AutoEllipsis = true;
-            Place(serverDetail, 62, 68, serverReady && nextReady ? width - 330 : width - 94, 52);
+            Place(serverDetail, 62, 68, serverReady && nextReady ? width - 330 : width - 94, serverVersionLabel.Visible ? 24 : 52);
+            Place(serverVersionLabel, 62, 92, serverReady && nextReady ? width - 330 : width - 94, 24);
             Place(heroNextAsn, width - 244, 74, 228, 44);
             heroNextAsn.AutoEllipsis = true;
         }
@@ -1861,6 +1872,9 @@ namespace AsnLabeler
                 previewDetail.Text = isBusy ? Loc.T("Warte auf Abschluss des Druckauftrags.") : (previewValid ? Loc.T("Bereit zum Drucken mit ") + (detectedMedia == null ? Loc.T("erkannter Rolle") : detectedMedia.ShortName) + "." : previewError);
             }
 
+            serverVersionLabel.Visible = !config.DemoMode && !serverChecking && !isRefreshingNext && !String.IsNullOrEmpty(client.ServerVersion);
+            serverVersionLabel.Text = "Server " + client.ServerVersion;
+            if (serverVersionLabel.Visible) serverDetail.Text = config.ServerUrl;
             ApplyStepVisual(printerStep, printerBadge, printerHeading, printerSub, serverComplete, serverComplete && printerReady, printerChecking);
             ApplyStepVisual(serverStep, serverBadge, serverHeading, serverSub, true, serverComplete, serverChecking || isRefreshingNext);
             ApplyStepVisual(previewStep, previewBadge, previewHeading, previewSub, canUsePreview, canUsePreview, false);
@@ -2391,7 +2405,7 @@ namespace AsnLabeler
             };
             label(general,Loc.T("Refresh (Sekunden)"),126);
             place(general,refreshSeconds,200,124,110,30); place(general,resetRefreshButton,320,122,36,36);
-            place(general,demoMode,20,188,550,32);
+            place(maintenance,demoMode,20,88,570,32);
             label(server,Loc.T("Serveradresse"),24); place(server,serverUrl,200,22,390,30);
             place(server,new Label { Text = Loc.T("z. B. https://asn.example.org"), ForeColor = Color.DimGray },200,56,390,26);
             label(server,"API-Key",106); place(server,apiKey,200,104,390,30);
@@ -2421,9 +2435,12 @@ namespace AsnLabeler
             var licenses = new Button { Text = Loc.T("Open-Source-Lizenzen") };
             licenses.Click += delegate { MessageBox.Show(this,ThirdPartyLicenses.Read(),Loc.T("Open-Source-Lizenzen"),MessageBoxButtons.OK,MessageBoxIcon.Information); };
             place(about,licenses,20,236,276,40);
+            var changelog = new Button { Text = "Changelog" };
+            changelog.Click += delegate { MessageBox.Show(this,ThirdPartyLicenses.ReadChangelog(),"Changelog",MessageBoxButtons.OK,MessageBoxIcon.Information); };
+            place(about,changelog,308,236,282,40);
             var updates = new Button { Text = ClientUpdates.Text("Nach Updates suchen", "Check for updates") };
             updates.Click += delegate { CheckUpdatesRequested = true; Close(); };
-            place(about,updates,308,236,282,40);
+            place(about,updates,20,288,570,40);
             resetProgress.SetBounds(24,488,632,4); Controls.Add(resetProgress);
             foreach (var control in previousControls) if (control.Parent == null) control.Dispose();
         }
@@ -2549,6 +2566,8 @@ namespace AsnLabeler
                 form.settingsTabs.SelectedIndex = 0;
                 if (form.settingsTabs.TabPages.Count != 6) failures.Add("Expected six settings tabs.");
                 if (form.copyLabelButton.Parent != form.settingsTabs.TabPages[4]) failures.Add("Secondary labels are not on their own tab.");
+                if (form.demoMode.Parent != form.settingsTabs.TabPages[3]) failures.Add("Demo mode is not on the maintenance tab.");
+                if (!ThirdPartyLicenses.ReadChangelog().Contains("## " + AppRelease.Version)) failures.Add("Current changelog is not embedded.");
                 if (form.languageHint.Visible) failures.Add("Language hint visible without a change.");
                 int originalLanguage = form.languageChoice.SelectedIndex;
                 form.languageChoice.SelectedIndex = originalLanguage == 0 ? 1 : 0;
@@ -2849,7 +2868,6 @@ namespace AsnLabeler
             grid.Columns[2].FillWeight = 23;
             grid.Columns[3].FillWeight = 33;
             grid.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = Loc.T("Aktion"), FillWeight = 15, SortMode = DataGridViewColumnSortMode.NotSortable });
-            grid.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = Loc.T("Kopien"), FillWeight = 10, SortMode = DataGridViewColumnSortMode.NotSortable });
             grid.CellContentClick += ResolveClicked;
             message.AutoEllipsis = true;
             message.ForeColor = Color.FromArgb(75, 85, 99);
@@ -2927,8 +2945,7 @@ namespace AsnLabeler
                 {
                     string state = item.status == "pending" ? Loc.T("Scan ausstehend") : item.status == "in_print" ? Loc.T("In Druck") : item.status == "imported" ? Loc.T("In Paperless") : item.status == "uncertain" ? Loc.T("Druck unklar") : item.status == "blocked" ? Loc.T("Gesperrt") : Loc.T("Nicht gedruckt");
                     string updated = item.updatedAt == 0 ? "–" : new DateTime(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc).AddSeconds(item.updatedAt).ToLocalTime().ToString("dd.MM.yy HH:mm");
-                    int row = grid.Rows.Add(item.barcodeText, state, updated, item.documentTitle, "", item.secondaryLabelCount > 0 ? item.secondaryLabelCount.ToString() : "");
-                    grid.Rows[row].Cells[5].ToolTipText = CopyReceipts.Tooltip(item.secondaryLabelCount);
+                    int row = grid.Rows.Add(item.barcodeText, state, updated, item.documentTitle, "");
                     grid.Rows[row].Tag = item;
                     if (selectedId != null && item.reservationId == selectedId) grid.CurrentCell = grid.Rows[row].Cells[0];
                     if (item.status == "uncertain") grid.Rows[row].Cells[4] = new DataGridViewButtonCell { Value = Loc.T("Beheben") };
@@ -3225,6 +3242,14 @@ namespace AsnLabeler
         readonly AppConfig config;
         readonly string apiKeyOverride;
         readonly JavaScriptSerializer json = new JavaScriptSerializer();
+        string observedVersion, observedServer;
+        public string ServerVersion { get { return observedServer == config.ServerUrl ? Volatile.Read(ref observedVersion) : null; } }
+        internal void ObserveVersion(string value)
+        {
+            Version parsed;
+            if (!String.IsNullOrEmpty(value) && value.Length <= 64 && Version.TryParse(value, out parsed))
+            { observedServer = config.ServerUrl; Volatile.Write(ref observedVersion, value); }
+        }
 
         public ReservationClient(AppConfig config, string apiKey = null)
         {
@@ -3244,7 +3269,9 @@ namespace AsnLabeler
 
         public Health Health()
         {
+            Volatile.Write(ref observedVersion, null);
             var health = Request<Health>("GET", "/health", false);
+            if (health != null) ObserveVersion(health.version);
             ValidateCompatibility(health);
             return health;
         }
@@ -3354,6 +3381,7 @@ namespace AsnLabeler
             using (var stream = response.GetResponseStream())
             using (var reader = new StreamReader(stream))
             {
+                ObserveVersion(response.Headers["X-ASN-Version"]);
                 var body = reader.ReadToEnd();
                 if (typeof(T) == typeof(object)) return default(T);
                 return json.Deserialize<T>(body);
@@ -3363,6 +3391,7 @@ namespace AsnLabeler
             {
                 var response = ex.Response as HttpWebResponse;
                 if (response == null) throw;
+                ObserveVersion(response.Headers["X-ASN-Version"]);
                 using (response)
                 using (var stream = response.GetResponseStream())
                 using (var reader = new StreamReader(stream))
@@ -3400,6 +3429,7 @@ namespace AsnLabeler
 
     sealed class Health
     {
+        public string version { get; set; }
         public int apiVersion { get; set; }
         public string minimumClientVersion { get; set; }
         public string[] capabilities { get; set; }

@@ -41,7 +41,7 @@ remain protected until resolved; the app does not automatically reprint them.
 
 ## Get Started
 
-1. **Host the service:** follow the [Docker deployment guide](reservation-service/README.md).
+1. **Host the service:** use the [ready-made Docker image](reservation-service/README.md#schnellstart-mit-fertigem-docker-image). Only a Compose file and your `.env` configuration are needed; Docker downloads the image from GHCR. No source checkout or release ZIP required.
    Preserve its database volume and `.env` across updates.
 2. **Install the client:** download the installer from a
    [client release](https://github.com/NightmindOfficial/asn-labeler/releases?q=client-v).

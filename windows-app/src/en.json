@@ -1,4 +1,7 @@
 {
+  "ASN suchen": "Search ASN",
+  "Suche zurücksetzen": "Clear search",
+  "Bitte eine gültige ASN-Nummer eingeben.": "Please enter a valid ASN number.",
   "Label erfolgreich gedruckt, Bestätigung konnte lokal nicht gespeichert werden. Nicht erneut drucken. Kopienzähler muss geprüft werden.\r\n": "Label printed successfully, but its confirmation could not be saved locally. Do not print again. The copy count needs checking.\r\n",
   "Diese Server-API wird vom Client nicht unterstützt. Bitte den Client aktualisieren.": "This server API is not supported by this client. Please update the client.",
   "Veralteter Client. Bitte den Client aktualisieren.": "Outdated client. Please update the client.",

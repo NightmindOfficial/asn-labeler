@@ -1,5 +1,14 @@
 # Client Changelog
 
+## 2.2.0
+
+- Sekundärlabels gezielt über die ASN suchen; Auswahl und Prüfung des Dokuments bleiben vor dem Druck erforderlich.
+- Sekundärlabel-Anzahl nur noch als Punkt-/Ring-Marker in der Dokumentauswahl, mit genauer Anzahl im Tooltip.
+- Serverversion unter der Adresse anzeigen, auch bei inkompatiblen Serverantworten.
+- Changelog offline unter Einstellungen > Über verfügbar; Update-Button über die gesamte Breite.
+- Demo-Modus in den Wartungsbereich verschoben.
+- Server 2.2.0 bleibt unverändert. Keine Änderungen an `.env` oder ASN-Vergaberegeln.
+
 ## 2.1.1
 
 - Unabhängige, RSA-signierte GitHub-Sicherheitsrichtlinie beim Start und bei manueller Updateprüfung; CLI prüft vor dem Drucken. Verifizierte Sperren bleiben offline erhalten und können nicht durch eine ältere Richtlinie oder Serverantwort aufgehoben werden.
