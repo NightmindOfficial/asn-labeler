@@ -1,5 +1,63 @@
 # Reservation-Service
 
+## Schnellstart mit fertigem Docker-Image
+
+Kein Git-Clone, lokaler Build oder Download des ZIP-Releasepakets erforderlich.
+Docker lädt das Image direkt aus GHCR. Für diesen Installationsweg brauchst du
+zwei kleine Dateien im selben dauerhaften Projektordner:
+
+- [docker-compose.registry.yml herunterladen](https://raw.githubusercontent.com/NightmindOfficial/asn-labeler/server-v2.2.0/reservation-service/docker-compose.registry.yml)
+- [.env.example herunterladen](https://raw.githubusercontent.com/NightmindOfficial/asn-labeler/server-v2.2.0/reservation-service/.env.example), anschließend in `.env` umbenennen.
+
+Die Vorlagen stammen aus Server 2.2.0; der darin verwendete Image-Tag `stable`
+folgt neueren stabilen Server-Releases. Vor Updates deren Änderungshinweise prüfen.
+
+1. In `.env` Paperless-Adresse, Paperless-Token sowie eigene, unterschiedliche
+   Client- und Admin-Schlüssel eintragen. Siehe Variablentabelle unter Einrichtung.
+2. In der Docker-Projektverwaltung die Registry-Compose-Datei verwenden und
+   sicherstellen, dass `.env` im Projektordner liegt. Alternativ dort ausführen:
+
+   ```sh
+   docker compose -f docker-compose.registry.yml up -d
+   ```
+
+3. Zugriff über einen HTTPS-Reverse-Proxy/Tunnel einrichten. Der veröffentlichte
+   Port ist standardmäßig nur am Docker-Host erreichbar. Für direkten LAN-Zugriff
+   `HOST_BIND_IP` auf dessen LAN-IP setzen; dies aktiviert selbst kein HTTPS.
+4. `/health` prüfen, dann `/admin/` öffnen und mit dem Admin-Schlüssel anmelden.
+
+Für manuelle Updates zuerst Druckaufträge beenden, Clients schließen und ein
+Backup erstellen. Dann die Update-Funktion der Docker-Verwaltung nutzen oder:
+
+```sh
+docker compose -f docker-compose.registry.yml pull
+docker compose -f docker-compose.registry.yml up -d
+```
+
+Projektname und Datenvolume beibehalten, niemals `down -v` ausführen. Diese
+manuellen Befehle übernehmen nicht die Druckruhe- und Backup-Prüfungen unseres
+optionalen Host-Updaters. Das Starten per Compose aktiviert keine automatische
+Installation zukünftiger Updates.
+
+### Warum ASN_SERVER_IMAGE?
+
+`${ASN_SERVER_IMAGE:-ghcr.io/nightmindofficial/asn-reservation:stable}` verwendet
+`stable`, solange keine nichtleere Überschreibung gesetzt ist. Der optionale
+Host-Updater setzt diese Variable vorübergehend auf den zuvor geprüften
+Image-Digest, damit er genau dieses Image startet.
+
+Wer ausschließlich über seine Docker-Oberfläche manuell aktualisiert, kann
+stattdessen eine feste Zeile verwenden:
+
+```yaml
+image: ghcr.io/nightmindofficial/asn-reservation:stable
+```
+
+Diese vereinfachte Variante nicht mit `update-server.sh` kombinieren: Das Skript
+benötigt die Variable für die Digest-Bindung. Eine zusätzliche Registrierung von
+GHCR als Suchquelle ist für Docker Compose nicht nötig, da die Registry bereits
+im Image-Namen steht.
+
 ## Updates ab 2.1
 
 Ab 2.1.1 gilt mindestens Client 2.1.1. Den Installer zuerst manuell aktualisieren,
@@ -69,7 +127,10 @@ die neueste GitHub-Version erzwungen.
 - Einen eigenen langen Client-Schlüssel und einen davon verschiedenen
   Admin-Schlüssel. Beide sind Zugangsdaten und dürfen nicht veröffentlicht werden.
 
-## Einrichtung
+## Einrichtung mit lokalem Build
+
+Dieser alternative Weg benötigt die Service-Quellen. Für die normale Installation
+mit fertigem Image genügt der Schnellstart oben.
 
 1. Dieses Service-Verzeichnis oder das vollständige Server-Releasepaket in einen
    dauerhaften Projektordner kopieren. `web/`, `licenses/`, `tests/` und alle

@@ -96,6 +96,11 @@ namespace AsnLabeler
         readonly Button next = new MaterialIconButton("\ue5cc") { AccessibleName = Loc.T("Nächste Seite"), Size = new Size(36, 36) };
         readonly Button refresh = new MaterialIconButton("\ue5d5") { AccessibleName = Loc.T("Dokumente aktualisieren"), Size = new Size(36, 36) };
         readonly Timer timer = new Timer();
+        readonly TextBox searchAsn = new TextBox { Anchor = AnchorStyles.Left | AnchorStyles.Right, MaxLength = 10, AccessibleName = "ASN" };
+        readonly Button search = new MaterialIconButton("\ue8b6") { Dock = DockStyle.Fill };
+        readonly Button clearSearch = new MaterialIconButton("\ue5cd") { Dock = DockStyle.Fill };
+        int filterAsn;
+        bool searchDirty;
         readonly ToolTip tips = new ToolTip();
         MediaInfo media = MediaInfo.DefaultDk11221();
         bool busy, hasMore;
@@ -131,11 +136,23 @@ namespace AsnLabeler
             grid.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill;
             grid.BackgroundColor = Color.White;
             grid.BorderStyle = BorderStyle.None;
+            grid.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "", Width = 28, AutoSizeMode = DataGridViewAutoSizeColumnMode.None, Resizable = DataGridViewTriState.False, SortMode = DataGridViewColumnSortMode.NotSortable });
             grid.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "ASN", FillWeight = 30, SortMode = DataGridViewColumnSortMode.NotSortable });
             grid.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = Loc.T("Dokumenttitel"), FillWeight = 70, SortMode = DataGridViewColumnSortMode.NotSortable });
-            grid.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = Loc.T("Kopien"), FillWeight = 15, SortMode = DataGridViewColumnSortMode.NotSortable });
+            grid.CellPainting += PaintCopyMarker;
             grid.SelectionChanged += delegate { UpdatePreview(); UpdateControls(); };
-            layout.Controls.Add(grid, 0, 1);
+            var documents = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 2 };
+            documents.RowStyles.Add(new RowStyle(SizeType.Absolute, 44));
+            documents.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+            var searchBar = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 4, RowCount = 1 };
+            searchBar.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 48));
+            searchBar.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+            searchBar.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 36));
+            searchBar.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 36));
+            searchBar.Controls.Add(new Label { Text = "ASN", Dock = DockStyle.Fill, TextAlign = ContentAlignment.MiddleLeft },0,0);
+            searchBar.Controls.Add(searchAsn,1,0); searchBar.Controls.Add(search,2,0); searchBar.Controls.Add(clearSearch,3,0);
+            documents.Controls.Add(searchBar,0,0); documents.Controls.Add(grid,0,1);
+            layout.Controls.Add(documents, 0, 1);
             var previewLayout = new TableLayoutPanel { Dock = DockStyle.Fill, RowCount = 2, ColumnCount = 1, Padding = new Padding(12, 0, 0, 0) };
             previewLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 40));
             previewLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
@@ -160,6 +177,15 @@ namespace AsnLabeler
             grid.ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.DisableResizing;
             grid.ColumnHeadersHeight = (int)(32 * scale);
             grid.RowTemplate.Height = (int)(28 * scale);
+            grid.Columns[0].Width = (int)(28 * scale);
+            documents.RowStyles[0].Height *= scale;
+            foreach (ColumnStyle column in searchBar.ColumnStyles) if (column.SizeType == SizeType.Absolute) column.Width *= scale;
+            search.AccessibleName = Loc.T("ASN suchen"); clearSearch.AccessibleName = Loc.T("Suche zurücksetzen");
+            tips.SetToolTip(search, search.AccessibleName); tips.SetToolTip(clearSearch, clearSearch.AccessibleName);
+            searchAsn.TextChanged += delegate { searchDirty = true; grid.ClearSelection(); grid.CurrentCell = null; UpdatePreview(); UpdateControls(); };
+            searchAsn.KeyDown += async (sender, e) => { if (e.KeyCode == Keys.Enter) { e.SuppressKeyPress = true; await SearchDocuments(); } };
+            search.Click += async delegate { await SearchDocuments(); };
+            clearSearch.Click += async delegate { searchAsn.Clear(); await SearchDocuments(); };
             foreach (var button in new[] { previous, next, refresh }) button.Size = new Size((int)(36 * scale), (int)(36 * scale));
             print.Height = (int)(40 * scale);
             print.Padding = new Padding((int)(8 * scale));
@@ -169,13 +195,54 @@ namespace AsnLabeler
             refresh.Click += async delegate { await LoadDocuments(); };
             print.Click += async delegate { await PrintCopy(); };
             timer.Interval = config.RefreshMilliseconds;
-            timer.Tick += async delegate { if (ContainsFocus && !busy) await LoadDocuments(); };
+            timer.Tick += async delegate { if (ContainsFocus && !busy && !searchDirty) await LoadDocuments(); };
             Shown += async delegate { if (!testMode) { await LoadDocuments(); timer.Start(); } };
             FormClosing += delegate(object sender, FormClosingEventArgs e) { if (busy) e.Cancel = true; };
             UpdateControls();
         }
 
         CopyDocument Selected { get { return grid.CurrentRow == null ? null : grid.CurrentRow.Tag as CopyDocument; } }
+
+        internal static bool ParseSearch(string text, out int asn)
+        {
+            text = text.Trim(); asn = 0;
+            return text.Length == 0 || (text.All(c => c >= '0' && c <= '9') &&
+                Int32.TryParse(text, out asn) && asn > 0);
+        }
+
+        async Task SearchDocuments()
+        {
+            if (busy) return;
+            int value;
+            if (!ParseSearch(searchAsn.Text, out value))
+            { status.Text = Loc.T("Bitte eine gültige ASN-Nummer eingeben."); return; }
+            filterAsn = value; page = 1; searchDirty = false;
+            grid.ClearSelection(); grid.CurrentCell = null;
+            await LoadDocuments();
+        }
+
+        void PaintCopyMarker(object sender, DataGridViewCellPaintingEventArgs e)
+        {
+            if (e.RowIndex < 0 || e.ColumnIndex != 0) return;
+            e.Paint(e.ClipBounds, DataGridViewPaintParts.All); e.Handled = true;
+            var item = grid.Rows[e.RowIndex].Tag as CopyDocument;
+            if (item == null || item.secondaryLabelCount <= 0) return;
+            float size = grid.Font.SizeInPoints * e.Graphics.DpiY / 72f;
+            var bounds = new RectangleF(e.CellBounds.X + (e.CellBounds.Width - size) / 2,
+                e.CellBounds.Y + (e.CellBounds.Height - size) / 2, size, size);
+            var old = e.Graphics.SmoothingMode;
+            e.Graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+            var orange = Color.FromArgb(245, 166, 35);
+            if (item.secondaryLabelCount == 1)
+                using (var brush = new SolidBrush(orange)) e.Graphics.FillEllipse(brush, bounds);
+            else
+            {
+                float stroke = 2 * e.Graphics.DpiY / 96f;
+                bounds.Inflate(-stroke / 2, -stroke / 2);
+                using (var pen = new Pen(orange, stroke)) e.Graphics.DrawEllipse(pen, bounds);
+            }
+            e.Graphics.SmoothingMode = old;
+        }
 
         static CopyDocumentList DemoDocuments()
         {
@@ -187,9 +254,11 @@ namespace AsnLabeler
 
         void UpdateControls()
         {
-            grid.Enabled = refresh.Enabled = !busy;
-            previous.Enabled = !busy && page > 1; next.Enabled = !busy && hasMore;
-            print.Enabled = !busy && Selected != null && Selected.status == "imported";
+            grid.Enabled = !busy && !searchDirty;
+            refresh.Enabled = !busy && !searchDirty;
+            searchAsn.Enabled = search.Enabled = clearSearch.Enabled = !busy;
+            previous.Enabled = !busy && !searchDirty && page > 1; next.Enabled = !busy && !searchDirty && hasMore;
+            print.Enabled = !busy && !searchDirty && Selected != null && Selected.status == "imported";
             progress.Visible = busy;
             pageLabel.Text = Loc.T("Seite ") + page;
         }
@@ -210,17 +279,18 @@ namespace AsnLabeler
             try
             {
                 var selected = Selected;
-                var data = config.DemoMode ? DemoDocuments() : await Task.Run(() => { CopyReceipts.Flush(config, client); return client.CopyDocuments(page); });
+                var data = config.DemoMode ? DemoDocuments() : await Task.Run(() => { CopyReceipts.Flush(config, client); return client.CopyDocuments(page, filterAsn); });
                 if (data.items == null) throw new InvalidOperationException(Loc.T("Keine gültige Dokumentliste erhalten. Service 1.3.2 benötigt."));
-                grid.Rows.Clear(); hasMore = data.hasMore;
+                grid.Rows.Clear(); hasMore = filterAsn == 0 && data.hasMore;
                 foreach (var item in data.items)
                 {
-                    if (item.status != "imported") continue;
+                    if (item.status != "imported" || (filterAsn > 0 && item.asnNumber != filterAsn)) continue;
                     if (config.DemoMode) item.secondaryLabelCount = config.DemoCopyCounts.ContainsKey(item.documentId.ToString()) ? config.DemoCopyCounts[item.documentId.ToString()] : 0;
-                    int row = grid.Rows.Add(item.barcodeText, item.documentTitle, item.secondaryLabelCount); grid.Rows[row].Tag = item;
-                    grid.Rows[row].Cells[2].ToolTipText = CopyReceipts.Tooltip(item.secondaryLabelCount);
-                    if (selected != null && selected.documentId == item.documentId) grid.CurrentCell = grid.Rows[row].Cells[0];
+                    int row = grid.Rows.Add("", item.barcodeText, item.documentTitle); grid.Rows[row].Tag = item;
+                    grid.Rows[row].Cells[0].ToolTipText = item.secondaryLabelCount > 0 ? CopyReceipts.Tooltip(item.secondaryLabelCount) : "";
+                    if (selected != null && selected.documentId == item.documentId) grid.CurrentCell = grid.Rows[row].Cells[1];
                 }
+                if (filterAsn > 0 && selected == null) { grid.ClearSelection(); grid.CurrentCell = null; }
                 UpdatePreview();
                 status.Text = grid.Rows.Count == 0 ? Loc.T("Keine Dokumente mit ASN in Paperless auf dieser Seite.") : Loc.T("Nur in Paperless erfasste Dokumente.");
             }
@@ -287,8 +357,8 @@ namespace AsnLabeler
                     });
                 }
                 selected.secondaryLabelCount++;
-                grid.CurrentRow.Cells[2].Value = selected.secondaryLabelCount;
-                grid.CurrentRow.Cells[2].ToolTipText = CopyReceipts.Tooltip(selected.secondaryLabelCount);
+                grid.CurrentRow.Cells[0].ToolTipText = CopyReceipts.Tooltip(selected.secondaryLabelCount);
+                grid.InvalidateCell(0, grid.CurrentRow.Index);
                 status.Text = (config.DemoMode ? "Demo · " : "") + selected.barcodeText + Loc.T(" · Sekundärlabel gedruckt. ASN-Zähler unverändert.");
             }
             catch (Exception ex)
@@ -323,6 +393,20 @@ namespace AsnLabeler
             }
             finally { foreach (string file in Directory.GetFiles(journal)) File.Delete(file); Directory.Delete(journal); }
             var settings = new AppConfig();
+            var versionClient = new ReservationClient(settings);
+            versionClient.ObserveVersion("2.2.0");
+            if (versionClient.ServerVersion != "2.2.0") failures.Add("Server version not retained.");
+            versionClient.ObserveVersion("<invalid>");
+            if (versionClient.ServerVersion != "2.2.0") failures.Add("Invalid server version accepted.");
+            settings.ServerUrl += "/other";
+            if (versionClient.ServerVersion != null) failures.Add("Server version leaked across endpoints.");
+            settings = new AppConfig();
+            int searchNumber;
+            foreach (string valid in new[] { "1", "00002", " 123 ", Int32.MaxValue.ToString() })
+                if (!ParseSearch(valid, out searchNumber) || searchNumber < 1) failures.Add("Valid ASN search rejected.");
+            foreach (string invalid in new[] { "0", "-1", "+2", "1.5", "ASN1", "2147483648", "?asn=1" })
+                if (ParseSearch(invalid, out searchNumber)) failures.Add("Invalid ASN search accepted.");
+            if (!ParseSearch("", out searchNumber) || searchNumber != 0) failures.Add("Clearing ASN search failed.");
             var snapshot = new SettingsSnapshot(settings, "test-key");
             settings.RefreshSeconds = 60; settings.ShowCompleted = true;
             if (snapshot.ServerChanged(settings, "test-key") || snapshot.PrinterChanged(settings)) failures.Add("Display changes request a server/printer refresh.");
@@ -355,7 +439,21 @@ namespace AsnLabeler
             using (var form = new CopyLabelForm(new AppConfig { DemoMode = true }, true))
             {
                 form.StartPosition = FormStartPosition.Manual; form.Location = new Point(-20000, -20000); form.ShowInTaskbar = false; form.Show();
-                foreach (var item in DemoDocuments().items) { int row = form.grid.Rows.Add(item.barcodeText, item.documentTitle, item.documentId == 2 ? 3 : 0); form.grid.Rows[row].Tag = item; }
+                form.config.DemoCopyCounts["1"] = 1; form.config.DemoCopyCounts["2"] = Int32.MaxValue;
+                form.LoadDocuments().GetAwaiter().GetResult();
+                form.searchAsn.Text = "00001";
+                if (form.print.Enabled || form.grid.Enabled) failures.Add("Changed search permits stale printing.");
+                form.SearchDocuments().GetAwaiter().GetResult();
+                if (form.grid.Rows.Count != 1 || form.Selected != null || form.print.Enabled || form.hasMore)
+                    failures.Add("Search must find exact ASN and require explicit selection.");
+                form.grid.CurrentCell = form.grid.Rows[0].Cells[1]; form.UpdateControls();
+                if (!form.print.Enabled || form.Selected.asnNumber != 1) failures.Add("Search result cannot be selected.");
+                form.searchAsn.Text = "999"; form.SearchDocuments().GetAwaiter().GetResult();
+                if (form.grid.Rows.Count != 0 || form.print.Enabled) failures.Add("Missing ASN retains printable result.");
+                form.searchAsn.Text = "invalid"; form.SearchDocuments().GetAwaiter().GetResult();
+                if (!form.searchDirty || form.print.Enabled) failures.Add("Invalid search permits printing.");
+                form.searchAsn.Clear(); form.SearchDocuments().GetAwaiter().GetResult();
+                if (form.grid.Rows.Count != 2 || form.filterAsn != 0) failures.Add("Reset search does not restore listing.");
                 form.UpdatePreview(); form.UpdateControls(); Application.DoEvents();
                 if (!form.print.Enabled) failures.Add("Copy selection does not enable printing.");
                 form.busy = true; form.UpdateControls();

@@ -86,11 +86,14 @@ Zählerabgleich ist kein Ersatz für die Klärung eines einzelnen Druckauftrags.
 
 In den Einstellungen können Sekundärlabels für bereits in Paperless vorhandene
 Dokumente gedruckt werden. Sie tragen `! -COPY- !` und vergeben keine neue ASN.
-Listen zeigen die Anzahl bestätigter Sekundärlabels. Die Zahl ist kein
+Die Auswahl bietet eine Suche nach der vollständigen ASN-Nummer, auch außerhalb
+der aktuell angezeigten Seite. Das Suchergebnis vor dem Drucken auswählen.
+Ein orangefarbener Punkt kennzeichnet ein bestätigtes Sekundärlabel, ein Ring
+mehrere. Beim Überfahren mit der Maus erscheint die genaue Anzahl. Die Zahl ist kein
 garantierter physischer Bestand: Ältere Clients melden keine Kopien, und ein
 Absturz vor Speicherung der Druckbestätigung kann zu Unterzählung führen.
 
-Der farblich markierte Demo-Modus simuliert Server und Drucker lokal, ohne echte
+Der farblich markierte Demo-Modus unter **Einstellungen → Wartung** simuliert Server und Drucker lokal, ohne echte
 API-Aufrufe oder Ausdrucke. Er eignet sich zum Kennenlernen der Oberfläche;
 für echte Drucke muss er ausgeschaltet werden.
 
