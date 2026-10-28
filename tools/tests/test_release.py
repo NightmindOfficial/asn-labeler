@@ -24,7 +24,7 @@ class VersionTests(unittest.TestCase):
     def test_compose_bind_address_matches_example(self):
         service = Path(__file__).resolve().parents[2] / "reservation-service"
         self.assertIn("HOST_BIND_IP=127.0.0.1", (service / ".env.example").read_text())
-        for filename in ("docker-compose.yml", "docker-compose.registry.yml"):
+        for filename in ("docker-compose.yaml", "docker-compose.registry.yaml"):
             self.assertIn('${HOST_BIND_IP:-127.0.0.1}:8765:8765',
                           (service / filename).read_text())
 
@@ -36,6 +36,18 @@ class VersionTests(unittest.TestCase):
                 (root / folder / "VERSION").write_text(version, encoding="utf-8")
             self.assertEqual(read_version(root, "client"), "2.0.0")
             self.assertEqual(read_version(root, "server"), "1.4.4")
+
+    def test_registry_compose_and_host_updater_keep_digest_binding(self):
+        service = Path(__file__).resolve().parents[2] / "reservation-service"
+        compose = (service / "docker-compose.registry.yaml").read_text()
+        updater = (service / "update-server.sh").read_text()
+        self.assertIn("image: ghcr.io/nightmindofficial/asn-reservation:stable", compose)
+        self.assertNotIn("ASN_SERVER_IMAGE", compose + updater)
+        self.assertIn('"$PWD/.asn-image.XXXXXX.yaml"', updater)
+        self.assertIn('-f "$override"', updater)
+        self.assertIn('"$image" > "$override"', updater)
+        self.assertIn('r.headers.get("X-ASN-Version")', updater)
+        self.assertFalse((service / "docker-compose.yml").exists())
 
     def test_runtime_changes_require_only_affected_version(self):
         self.assertTrue(needs_version_bump("client", ["windows-app/src/Program.cs"]))

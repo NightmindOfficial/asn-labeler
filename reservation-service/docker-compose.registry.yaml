@@ -1,6 +1,6 @@
 services:
   asn-reservation:
-    image: ${ASN_SERVER_IMAGE:-ghcr.io/nightmindofficial/asn-reservation:stable}
+    image: ghcr.io/nightmindofficial/asn-reservation:stable
     container_name: asn-reservation
     restart: unless-stopped
     env_file:

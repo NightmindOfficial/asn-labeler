@@ -934,9 +934,7 @@ class ApiRequest:
             if path == "/api/admin/updates" and method in ("GET", "POST"):
                 self.route = path
                 updates = server_updates()
-                if method == "POST" and time.time() - updates.last_attempt >= 60:
-                    threading.Thread(target=updates.refresh, daemon=True).start()
-                return self.send_json(updates.status())
+                return self.send_json(updates.request_refresh() if method == "POST" else updates.status())
             new_work = (path in ("/api/reservations/next", "/api/documents/copy-labels/start") or
                         re.fullmatch(r"/api/reservations/[a-zA-Z0-9-]{1,64}/printing", path))
             if method == "POST" and new_work and server_updates().status()["blocked"]:

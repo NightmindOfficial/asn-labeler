@@ -6,10 +6,10 @@ Kein Git-Clone, lokaler Build oder Download des ZIP-Releasepakets erforderlich.
 Docker lädt das Image direkt aus GHCR. Für diesen Installationsweg brauchst du
 zwei kleine Dateien im selben dauerhaften Projektordner:
 
-- [docker-compose.registry.yml herunterladen](https://raw.githubusercontent.com/NightmindOfficial/asn-labeler/server-v2.2.0/reservation-service/docker-compose.registry.yml)
-- [.env.example herunterladen](https://raw.githubusercontent.com/NightmindOfficial/asn-labeler/server-v2.2.0/reservation-service/.env.example), anschließend in `.env` umbenennen.
+- [docker-compose.registry.yaml herunterladen](https://raw.githubusercontent.com/NightmindOfficial/asn-labeler/server-v2.2.1/reservation-service/docker-compose.registry.yaml)
+- [.env.example herunterladen](https://raw.githubusercontent.com/NightmindOfficial/asn-labeler/server-v2.2.1/reservation-service/.env.example), anschließend in `.env` umbenennen.
 
-Die Vorlagen stammen aus Server 2.2.0; der darin verwendete Image-Tag `stable`
+Die Vorlagen stammen aus Server 2.2.1; der darin verwendete Image-Tag `stable`
 folgt neueren stabilen Server-Releases. Vor Updates deren Änderungshinweise prüfen.
 
 1. In `.env` Paperless-Adresse, Paperless-Token sowie eigene, unterschiedliche
@@ -18,7 +18,7 @@ folgt neueren stabilen Server-Releases. Vor Updates deren Änderungshinweise pr�
    sicherstellen, dass `.env` im Projektordner liegt. Alternativ dort ausführen:
 
    ```sh
-   docker compose -f docker-compose.registry.yml up -d
+   docker compose -f docker-compose.registry.yaml up -d
    ```
 
 3. Zugriff über einen HTTPS-Reverse-Proxy/Tunnel einrichten. Der veröffentlichte
@@ -30,8 +30,8 @@ Für manuelle Updates zuerst Druckaufträge beenden, Clients schließen und ein
 Backup erstellen. Dann die Update-Funktion der Docker-Verwaltung nutzen oder:
 
 ```sh
-docker compose -f docker-compose.registry.yml pull
-docker compose -f docker-compose.registry.yml up -d
+docker compose -f docker-compose.registry.yaml pull
+docker compose -f docker-compose.registry.yaml up -d
 ```
 
 Projektname und Datenvolume beibehalten, niemals `down -v` ausführen. Diese
@@ -39,24 +39,27 @@ manuellen Befehle übernehmen nicht die Druckruhe- und Backup-Prüfungen unseres
 optionalen Host-Updaters. Das Starten per Compose aktiviert keine automatische
 Installation zukünftiger Updates.
 
-### Warum ASN_SERVER_IMAGE?
+### Image und Migration ab 2.2.1
 
-`${ASN_SERVER_IMAGE:-ghcr.io/nightmindofficial/asn-reservation:stable}` verwendet
-`stable`, solange keine nichtleere Überschreibung gesetzt ist. Der optionale
-Host-Updater setzt diese Variable vorübergehend auf den zuvor geprüften
-Image-Digest, damit er genau dieses Image startet.
-
-Wer ausschließlich über seine Docker-Oberfläche manuell aktualisiert, kann
-stattdessen eine feste Zeile verwenden:
+Die Standarddatei enthält eine feste Imageadresse, die Docker-Oberflächen
+direkt für ihre Updateerkennung verwenden können:
 
 ```yaml
 image: ghcr.io/nightmindofficial/asn-reservation:stable
 ```
 
-Diese vereinfachte Variante nicht mit `update-server.sh` kombinieren: Das Skript
-benötigt die Variable für die Digest-Bindung. Eine zusätzliche Registrierung von
-GHCR als Suchquelle ist für Docker Compose nicht nötig, da die Registry bereits
-im Image-Namen steht.
+Der Host-Updater bindet den zuvor geprüften Digest über eine temporäre
+Compose-Override-Datei. `ASN_SERVER_IMAGE` wird nicht mehr ausgewertet; eine
+eigene Version oder Registry direkt im Compose-Imagefeld konfigurieren. Bei
+einer eigenen Registry den offiziellen Host-Updater nicht verwenden.
+
+Bei bestehenden Installationen die `.yml`-Datei durch die entsprechende
+`.yaml`-Datei ersetzen und Dateiverweise in Docker-Projekt, Aufgabenplaner und
+eigenen Skripten anpassen. Immer denselben Projektordner, Projektnamen und das
+bestehende Datenvolume verwenden. Die alten Dateien nicht als zweites Projekt
+starten. `.env` beibehalten; eine selbst ergänzte `ASN_SERVER_IMAGE` entfernen
+und einen gewünschten Image-Pin vorher in Compose übernehmen. Sonst würde die
+neue Vorlage statt des Pins `stable` verwenden.
 
 ## Updates ab 2.1
 
@@ -69,14 +72,17 @@ Erforderliche Releases müssen veröffentlicht sein, bevor eine neue zentrale
 Richtlinie aktiviert wird. Gespeicherte Sperren werden bei Ausfällen nicht gelöscht.
 Die eingebettete Mindest-Clientversion bleibt eine zusätzliche Untergrenze.
 
-standardmäßig gibt es nur Hinweise im Adminpanel. Stündlich wird ohne
+Standardmäßig gibt es nur Hinweise im Adminpanel. Unter **Einstellungen → Nach
+Updates suchen** kann zusätzlich manuell geprüft werden; Wiederholungen innerhalb
+von 60 Sekunden verwenden den vorhandenen Stand. Der Button installiert nichts.
+Stündlich wird ohne
 API-Schlüssel oder Dokumentdaten die offizielle GitHub-Release-Richtlinie gelesen.
 Nur nachweislich unsichere Versionen sperren neue Reservierungen, Druckstarts und
 Sekundärlabel-Starts. Bestätigungen und sichere Freigaben bleiben möglich.
 Ein unbekannter Stand oder GitHub-Ausfall erzeugt keine Sperre; eine bereits
 bekannte Sperre bleibt jedoch auch nach Neustart und Netzausfall erhalten.
 
-Für fertige Docker-Images die `docker-compose.registry.yml` im **bestehenden**
+Für fertige Docker-Images die `docker-compose.registry.yaml` im **bestehenden**
 Compose-Projekt verwenden. Projektname, `.env`, Datenvolume und Netz bleiben gleich.
 Der Standardtag `stable` folgt stabilen Server-Releases. Beim ersten GHCR-Release
 muss der Herausgeber das Paket einmal auf Public stellen. Plattform: linux/amd64.

@@ -4,8 +4,8 @@ LABEL org.opencontainers.image.source="https://github.com/NightmindOfficial/asn-
 WORKDIR /opt/asn
 COPY requirements.txt /tmp/asn-requirements.txt
 RUN pip install --no-cache-dir --require-hashes --only-binary=:all: -r /tmp/asn-requirements.txt && rm /tmp/asn-requirements.txt
-COPY app.py admin.py server_updates.py release-policy.json package_source.py Dockerfile docker-compose.yml requirements.txt .env.example .dockerignore README.md VERSION CHANGELOG.md /tmp/asn-source/
-COPY maintenance.py docker-compose.registry.yml update-server.sh /tmp/asn-source/
+COPY app.py admin.py server_updates.py release-policy.json package_source.py Dockerfile docker-compose.yaml requirements.txt .env.example .dockerignore README.md VERSION CHANGELOG.md /tmp/asn-source/
+COPY maintenance.py docker-compose.registry.yaml update-server.sh /tmp/asn-source/
 COPY security_policy.py policy-key.json /tmp/asn-source/
 COPY tests/ /tmp/asn-source/tests/
 COPY web/ /tmp/asn-source/web/

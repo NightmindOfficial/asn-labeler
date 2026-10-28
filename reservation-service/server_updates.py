@@ -84,6 +84,7 @@ class ServerUpdates:
         self.connect, self.current, self.log = connect, current, log
         self.lock = threading.Lock()
         self.check_lock = threading.Lock()
+        self.refresh_lock = threading.Lock()
         self.last_attempt = 0
         self.error = None
         with self.connect() as conn:
@@ -130,6 +131,7 @@ class ServerUpdates:
                 "securityReason": central[3] if central else None,
                 "blocked": blocked, "updateAvailable": bool(latest and version(latest) > version(self.current)),
                 "checkedAt": checked, "lastAttempt": attempted, "checkFailed": bool(error),
+                "checking": self.refresh_lock.locked(), "retryAfter": max(0, 60 - int(time.time() - attempted)),
                 "state": "blocked" if blocked else "unknown" if not row else "update_available" if version(latest) > version(self.current) else "current",
                 "releaseUrl": f"https://github.com/{REPOSITORY}/releases/tag/server-v{latest}" if latest else None}
 
@@ -159,9 +161,38 @@ class ServerUpdates:
             self.check_lock.release()
         return self.status()
 
+    def _refresh_claimed(self):
+        try:
+            self.check_security()
+            self.check()
+        finally:
+            self.refresh_lock.release()
+        return self.status()
+
     def refresh(self):
-        self.check_security()
-        return self.check()
+        if not self.refresh_lock.acquire(blocking=False):
+            return self.status()
+        with self.lock:
+            self.last_attempt = int(time.time())
+        return self._refresh_claimed()
+
+    def request_refresh(self):
+        # Claim before spawning so simultaneous admins cannot multiply workers.
+        if not self.refresh_lock.acquire(blocking=False):
+            return self.status()
+        with self.lock:
+            recent = time.time() - self.last_attempt < 60
+            if not recent:
+                self.last_attempt = int(time.time())
+        if recent:
+            self.refresh_lock.release()
+        else:
+            try:
+                threading.Thread(target=self._refresh_claimed, name="manual-update-check", daemon=True).start()
+            except Exception:
+                self.refresh_lock.release()
+                raise
+        return self.status()
 
     def start(self):
         def worker():

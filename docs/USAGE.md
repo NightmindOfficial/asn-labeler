@@ -97,6 +97,35 @@ Der farblich markierte Demo-Modus unter **Einstellungen → Wartung** simuliert 
 API-Aufrufe oder Ausdrucke. Er eignet sich zum Kennenlernen der Oberfläche;
 für echte Drucke muss er ausgeschaltet werden.
 
+## A4-Stellvertreterkarten (ab Client 2.3)
+
+Unter **Einstellungen → Sekundärlabel → Stellvertreterkarte** ein bereits in
+Paperless erfasstes Dokument wählen. Titel und ASN werden übernommen; Ort,
+temporäre/dauerhafte Auslagerung, optionale Entnahme-/Rückgabedaten und Handzeichen
+ergänzen. Die Vorschau zeigt die A4-Seite mit freiem Platz für das aufgeklebte Label.
+Der Titel ist schreibgeschützt und stammt immer aus Paperless. Bei dauerhafter
+Auslagerung entfällt die geplante Rückgabe. Das ursprüngliche Kartenlayout verwendet
+Aptos: Die App nutzt eine installierte Schrift oder den vorhandenen Office-Fontcache.
+Fehlt Aptos, wird der Kartendruck mit einem Hinweis angehalten statt die Schrift
+unbemerkt zu ersetzen. Schriftdateien werden nicht mitgeliefert.
+
+**A4 drucken** öffnet die Windows-Druckerauswahl. Einen normalen A4-Drucker wählen,
+nicht den Brother-Labeldrucker. Bei erreichbarem Brother ist **Sekundärlabel
+mitdrucken** vorausgewählt und kann abgewählt werden. Das Label wird erst nach
+erfolgreicher Übergabe des A4-Auftrags separat gedruckt. Ein abgebrochener
+A4-Druckdialog löst keinen Labeldruck aus. Nach einem regulären Sekundärlabeldruck
+wird die Karte ebenfalls angeboten, dann ohne ein weiteres Label.
+
+**Blanko-Stellvertreterkarte** druckt die leeren Formularfelder ohne API-Abfrage,
+Dokumentzuordnung oder Sekundärlabel und öffnet direkt die Druckerauswahl, ohne
+Vorschaufenster. Im Demo-Modus werden beide Druckwege nur
+simuliert. Ausgefüllte Kartendaten bleiben im Dialog und werden nicht gespeichert.
+
+Die Windows-Warteschlange bestätigt die Annahme, nicht die physische Ausgabe.
+Bei Fehlern Warteschlange und Ausdruck prüfen; es gibt keine automatischen
+Wiederholungsdrucke. Scheitert allein das Label, die A4-Karte nicht nochmals
+drucken, sondern das Sekundärlabel separat nach Prüfung nachholen.
+
 ## Drucken ohne Fenster (ab 2.1)
 
 Die optionale CLI im Installer aktivieren, App einrichten und schließen.
