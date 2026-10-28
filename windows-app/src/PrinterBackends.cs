@@ -829,7 +829,8 @@ namespace AsnLabeler
         sealed class FakePrinter : IPrinterSession
         {
             public Action<Action> Send;
-            public PrinterStatus ReadStatus() { return PrinterStatus.Ready(MediaInfo.DefaultDk11221()); }
+            public Func<PrinterStatus> Status;
+            public PrinterStatus ReadStatus() { return Status==null ? PrinterStatus.Ready(MediaInfo.DefaultDk11221()) : Status(); }
             public bool CutAfter;
             public void Print(string text, MediaInfo media, Action beforeSend, bool cutAfter = true) { CutAfter = cutAfter; Send(beforeSend); }
             public void Dispose() { }
@@ -838,6 +839,26 @@ namespace AsnLabeler
         {
             var failures = new List<string>();
             int cliCount; bool cliCut;
+            foreach(var args in new[] {new[] {"-m"},new[] {"--media","-j"},new[] {"--json","-m"}})
+                if(!HeadlessCli.IsMediaCommand(args)) failures.Add("CLI media command rejected.");
+            foreach(var args in new[] {new[] {"-m","-m"},new[] {"print","-m"},new[] {"-m","-c","2"},new[] {"-m","unknown"}})
+                if(HeadlessCli.IsMediaCommand(args)) failures.Add("CLI invalid media command accepted.");
+            foreach(bool json in new[] {false,true}) foreach(bool continuous in new[] {false,true}) {
+                var output=new StringWriter(); var errors=new StringWriter();
+                var medium=continuous ? MediaInfo.FromStatus(0x4A,62,0) : MediaInfo.DefaultDk11221();
+                var printer=new FakePrinter {Status=()=>PrinterStatus.Ready(medium),Send=before=>{throw new Exception("Query must never print");}};
+                int result=HeadlessCli.ReadMedia(new PrinterChoice {Name="Office Brother",Driver="Brother QL-800"},()=>printer,output,errors,json);
+                if(result!=0 || errors.ToString()!="" || !output.ToString().Contains("QL-800")) failures.Add("CLI media query failed.");
+                if(json) {
+                    var data=new System.Web.Script.Serialization.JavaScriptSerializer().Deserialize<Dictionary<string,object>>(output.ToString());
+                    if((bool)data["continuous"]!=continuous || Convert.ToInt32(data["widthMm"])!=medium.WidthMm || (continuous && data["lengthMm"]!=null)) failures.Add("CLI media dimensions incorrect.");
+                }
+            }
+            {
+                var output=new StringWriter(); var errors=new StringWriter();
+                int result=HeadlessCli.ReadMedia(new PrinterChoice(),()=>{throw new TimeoutException("secret-url");},output,errors,true);
+                if(result!=2 || errors.ToString().Contains("secret-url") || output.ToString()!="") failures.Add("CLI media failure handling incorrect.");
+            }
             foreach (var invalidArgs in new[] { new[] { "print", "--count", "0" }, new[] { "print", "--count", "11" },
                 new[] { "print", "--count" }, new[] { "print", "--unknown" }, new[] { "print", "--cut-each", "--cut-each" } })
                 if (HeadlessCli.Parse(invalidArgs, out cliCount, out cliCut)) failures.Add("CLI accepted invalid arguments.");
@@ -845,10 +866,14 @@ namespace AsnLabeler
                 failures.Add("CLI argument parsing failed.");
             if (!HeadlessCli.Parse(new[] { "print", "-c", "3", "-s" }, out cliCount, out cliCut) || cliCount != 3 || !cliCut)
                 failures.Add("CLI short flags failed.");
+            foreach(string flag in new[] {"-j","--json"})
+                if(!HeadlessCli.Parse(new[] {"print",flag,"-c","2"},out cliCount,out cliCut) || cliCount!=2) failures.Add("CLI JSON flag failed.");
+            if(HeadlessCli.Parse(new[] {"print","-j","--json"},out cliCount,out cliCut)) failures.Add("CLI duplicate JSON flag accepted.");
             foreach (var invalidArgs in new[] { new[] { "print", "-c", "0" }, new[] { "print", "-c" },
                 new[] { "print", "-s", "--cut-each" }, new[] { "print", "-c", "2", "--count", "3" } })
                 if (HeadlessCli.Parse(invalidArgs, out cliCount, out cliCut)) failures.Add("CLI accepted duplicate/invalid short flags.");
             foreach (string scenario in new[] { "success", "preflight", "reserve", "prepare", "handshake", "send", "ack" })
+            foreach (bool json in new[] {false,true})
             {
                 int allocated = 0, acknowledged = 0, released = 0;
                 var cuts = new List<bool>();
@@ -863,7 +888,16 @@ namespace AsnLabeler
                     () => { if (scenario == "reserve") throw new TimeoutException(); allocated++; return new Reservation { reservationId = "test", barcodeText = "ASN00001" }; },
                     id => { if (scenario == "handshake") throw new TimeoutException(); },
                     id => { if (scenario == "ack") throw new TimeoutException(); acknowledged++; cuts.Add(printer.CutAfter); },
-                    id => released++, output, errors);
+                    id => released++, output, errors,json);
+                string allOutput=output.ToString()+errors.ToString();
+                if(json) {
+                    foreach(string line in allOutput.Split(new[] {'\r','\n'},StringSplitOptions.RemoveEmptyEntries))
+                        try { new System.Web.Script.Serialization.JavaScriptSerializer().DeserializeObject(line); } catch { failures.Add("CLI JSON contaminated by text."); }
+                    if(scenario=="success" && output.ToString().Split(new[] {'\n'},StringSplitOptions.RemoveEmptyEntries).Length!=4) failures.Add("CLI JSON event schema changed.");
+                } else {
+                    if(allOutput.Contains("\"status\":") || allOutput.Contains("\"error\":")) failures.Add("CLI default output contains JSON.");
+                    if(!allOutput.Contains("[1/2]") || (allocated>0 && !allOutput.Contains("ASN00001"))) failures.Add("CLI progress lacks context.");
+                }
                 int expected = scenario == "success" ? 0 : new[] { "handshake", "send", "ack" }.Contains(scenario) ? 5 : 4;
                 if (result != expected) failures.Add("CLI exit code: " + scenario);
                 if (released != (scenario == "prepare" ? 1 : 0)) failures.Add("CLI unsafe release: " + scenario);
