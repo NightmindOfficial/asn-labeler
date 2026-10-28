@@ -38,7 +38,11 @@ try {
     $cliVersion = & $cli -v
     if ($LASTEXITCODE -ne 0 -or $cliVersion -ne $version) { throw 'Installed CLI version command failed.' }
     $help = (& $cli help) -join "`n"
-    if ($LASTEXITCODE -ne 0 -or $help -notmatch 'asnlbl print' -or $help -notmatch '-c NUMBER' -or $help -notmatch '-s') { throw 'CLI help missing syntax or flags.' }
+    if ($LASTEXITCODE -ne 0) { throw 'Installed CLI help command failed.' }
+    # Check the command contract, not translated headings or argument names.
+    foreach ($pattern in @('asnlbl print', 'asnlbl -m', '(?m)^\s+-c\s+\S+', '(?m)^\s+-s\s+', '(?m)^\s+-j\s+', '--json', '--media')) {
+        if ($help -notmatch $pattern) { throw "CLI help missing syntax or flags (pattern: $pattern)." }
+    }
     & $cli print -c 0
     if ($LASTEXITCODE -ne 2) { throw 'Installed CLI did not reject invalid quantity.' }
     if ((Get-ItemProperty $registry).InstallPath -ne $destination) { throw 'Installation registration missing.' }
