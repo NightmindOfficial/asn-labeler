@@ -1,5 +1,13 @@
 # Client Changelog
 
+## 2.3.0
+
+- A4-Stellvertreterkarten mit Dokumentauswahl, Aufbewahrungsort, Dauer, optionalen Entnahme-/Rückgabedaten und Handzeichen; Vorschau und Windows-Druckerauswahl getrennt vom Brother-Labeldruck.
+- Nach einem Sekundärlabel optional eine Karte drucken; beim Kartendruck mit erreichbarem Brother standardmäßig ein Sekundärlabel mitdrucken, abwählbar.
+- Blankokarten ohne API, Dokumentzuordnung oder Labeldruck. Kartendaten werden nicht auf dem Server gespeichert und verändern keine ASN.
+- Karten verwenden das ursprüngliche Vorlagenlayout; der Dokumenttitel stammt unveränderbar aus Paperless. Dauerhafte Entnahmen enthalten keine geplante Rückgabe, Blankokarten öffnen direkt die Druckerauswahl.
+- Keine Änderungen an `.env` erforderlich.
+
 ## 2.2.0
 
 - Sekundärlabels gezielt über die ASN suchen; Auswahl und Prüfung des Dokuments bleiben vor dem Druck erforderlich.

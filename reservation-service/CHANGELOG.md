@@ -1,5 +1,12 @@
 # Server Changelog
 
+## 2.2.1
+
+- Manuelle Updateprüfung in den Admin-Einstellungen mit Ladezustand und Ergebnis; parallele Prüfungen und Wiederholungen innerhalb von 60 Sekunden werden zusammengefasst.
+- Compose-Dateien heißen jetzt `docker-compose.yaml` und `docker-compose.registry.yaml`; bestehende Projekt-/Volume-Namen beibehalten und Dateiverweise anpassen.
+- Registry-Compose verwendet eine feste `stable`-Imageadresse. Der optionale Host-Updater bindet den geprüften Digest über eine temporäre Override-Datei und prüft die Version über den Health-Response-Header.
+- `.env`: keine neuen Pflichtvariablen. Eine bisher selbst gesetzte `ASN_SERVER_IMAGE` wird nicht mehr ausgewertet; eigene Image-Pins direkt in Compose bzw. einer Override-Datei pflegen.
+
 ## 2.2.0
 
 - Öffentlicher Healthcheck auf Betriebs- und Kompatibilitätsangaben reduziert; Update-Diagnosen bleiben ausschließlich im authentifizierten Adminbereich verfügbar.

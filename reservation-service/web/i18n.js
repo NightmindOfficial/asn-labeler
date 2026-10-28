@@ -1,6 +1,11 @@
 "use strict";
 window.ASNLocale = (() => {
   const en = {
+    "Nach Updates suchen":"Check for updates",
+    "Updates werden geprüft…":"Checking for updates…",
+    "Prüfung läuft noch. Bitte später erneut prüfen.":"Check still running. Please check again later.",
+    "Updateprüfung fehlgeschlagen. Bitte später erneut versuchen.":"Update check failed. Please try again later.",
+    "Der Server ist aktuell.":"The server is up to date.",
     "Entwicklermodus":"Developer mode",
     "Eintrag kopieren":"Copy entry", "Kopiert":"Copied",
     "Kopieren fehlgeschlagen. Bitte die Browserberechtigung prüfen.":"Copy failed. Please check browser permissions.",

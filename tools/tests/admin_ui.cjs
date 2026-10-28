@@ -14,6 +14,7 @@ const version = fs.readFileSync(path.join(root, '../VERSION'), 'utf8').trim();
       const page = await browser.newPage({ viewport: size });
       const errors = []; page.on('pageerror', e => errors.push(e.message));
       let offline = false, healthCalls = 0, serverVersion = version, documentFailure = false, logCalls = 0;
+      let updateFailure = false, updatePolls = 0;
       await page.addInitScript(() => Object.defineProperty(navigator, 'clipboard', {value:{writeText:async text => {window.copiedEntry = text;}}}));
       await page.route('http://localhost/**', async route => {
         const url = new URL(route.request().url());
@@ -24,6 +25,11 @@ const version = fs.readFileSync(path.join(root, '../VERSION'), 'utf8').trim();
         }
         if (url.pathname.startsWith('/api/')) {
           if (offline) return route.abort();
+          if (url.pathname === '/api/admin/updates') {
+            const checking = route.request().method() === 'POST';
+            if (!checking) updatePolls++;
+            return route.fulfill({json:{checking, checkFailed:updateFailure,state:'current',currentVersion:version,latestVersion:version},headers:{'X-ASN-Version':serverVersion}});
+          }
           if (url.pathname === '/api/admin/logs') logCalls++;
           const items = url.pathname === '/api/documents/status'
             ? [0,1,2,231389271893].map((copies,i)=>({barcodeText:'ASN0000'+(4-i),status:'imported',documentTitle:'Beispieldokument '+i,reservationId:'example'+i,secondaryLabelCount:copies,updatedAt:1792800000}))
@@ -87,6 +93,15 @@ const version = fs.readFileSync(path.join(root, '../VERSION'), 'utf8').trim();
       });
       assert.equal(await page.locator('#rows td:nth-child(3) .copy-marker').count(),0);
       await page.locator('#settings').click(); await page.locator('#developerMode').check();
+      await page.locator('#checkUpdates').click();
+      await page.waitForFunction(() => document.getElementById('checkUpdates').getAttribute('aria-busy') === 'true');
+      await page.clock.runFor(1600);
+      await page.waitForFunction(() => document.getElementById('updateCheckResult').textContent.startsWith('Der Server ist aktuell.'));
+      assert(updatePolls > 0);
+      updateFailure = true;
+      await page.locator('#checkUpdates').click(); await page.clock.runFor(1600);
+      await page.waitForFunction(() => document.getElementById('updateCheckResult').textContent.startsWith('Updateprüfung fehlgeschlagen.'));
+      updateFailure = false;
       await page.screenshot({path:path.resolve('artifacts/admin-settings-'+size.width+'.png')});
       await page.locator('#closeSettings').click();
       await page.locator('[data-tab="logs"]').click();

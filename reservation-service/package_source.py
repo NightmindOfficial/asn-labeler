@@ -8,9 +8,9 @@ from zipfile import ZIP_DEFLATED, ZipFile
 
 FILES = (
     "security_policy.py", "policy-key.json",
-    "app.py", "admin.py", "server_updates.py", "release-policy.json", "package_source.py", "Dockerfile", "docker-compose.yml",
+    "app.py", "admin.py", "server_updates.py", "release-policy.json", "package_source.py", "Dockerfile", "docker-compose.yaml",
     "requirements.txt", ".env.example", ".dockerignore", "README.md", "VERSION", "CHANGELOG.md",
-    "maintenance.py", "docker-compose.registry.yml", "update-server.sh",
+    "maintenance.py", "docker-compose.registry.yaml", "update-server.sh",
 )
 DIRECTORIES = {"web": {".html", ".js", ".css", ".ico", ".ttf", ".txt"},
                "tests": {".py"}, "licenses": {".txt", ".md", ""}}

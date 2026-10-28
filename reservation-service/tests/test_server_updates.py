@@ -2,6 +2,7 @@ import io
 import json
 import os
 import tempfile
+import threading
 import unittest
 from unittest import mock
 
@@ -19,6 +20,39 @@ def release_fetch(minimum="2.2.0", latest="2.2.0"):
 
 
 class ServerUpdateTests(unittest.TestCase):
+    def test_manual_check_claims_worker_and_coalesces_requests(self):
+        entered, finish = threading.Event(), threading.Event()
+        workers = []
+        real_thread = threading.Thread
+        def spawn(**kwargs):
+            worker = real_thread(**kwargs)
+            workers.append(worker)
+            return worker
+        def check():
+            entered.set()
+            finish.wait(5)
+        with mock.patch.object(self.updates, "check_security"), mock.patch.object(self.updates, "check", side_effect=check) as release_check, mock.patch("server_updates.threading.Thread", side_effect=spawn):
+            try:
+                self.assertTrue(self.updates.request_refresh()["checking"])
+                self.assertTrue(entered.wait(2))
+                self.assertTrue(self.updates.request_refresh()["checking"])
+                release_check.assert_called_once()
+            finally:
+                finish.set()
+                for worker in workers:
+                    worker.join(5)
+                    self.assertFalse(worker.is_alive())
+            state = self.updates.request_refresh()
+            self.assertFalse(state["checking"])
+            self.assertGreater(state["retryAfter"], 0)
+            release_check.assert_called_once()
+
+    def test_manual_check_releases_claim_on_worker_start_failure(self):
+        with mock.patch("server_updates.threading.Thread.start", side_effect=RuntimeError("test")):
+            with self.assertRaises(RuntimeError):
+                self.updates.request_refresh()
+        self.assertFalse(self.updates.status()["checking"])
+
     def setUp(self):
         folder = tempfile.TemporaryDirectory()
         self.addCleanup(folder.cleanup)

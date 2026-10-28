@@ -85,6 +85,7 @@ namespace AsnLabeler
     {
         readonly AppConfig config;
         readonly ReservationClient client;
+        readonly bool cardMode;
         readonly DataGridView grid = new DataGridView();
         readonly PictureBox preview = new PictureBox { Dock = DockStyle.Fill, SizeMode = PictureBoxSizeMode.Zoom };
         readonly Label previewTitle = new Label { Dock = DockStyle.Fill, TextAlign = ContentAlignment.MiddleLeft };
@@ -106,11 +107,13 @@ namespace AsnLabeler
         bool busy, hasMore;
         int page = 1;
 
-        public CopyLabelForm(AppConfig config, bool testMode = false)
+        public CopyLabelForm(AppConfig config, bool testMode = false, bool cardMode = false)
         {
             this.config = config;
+            this.cardMode = cardMode;
             client = new ReservationClient(config);
-            Text = Loc.T("Sekundärlabel") + (config.DemoMode ? " · Demo" : "");
+            Text = Loc.T(cardMode ? "Stellvertreterkarte" : "Sekundärlabel") + (config.DemoMode ? " · Demo" : "");
+            if (cardMode) print.Text = Loc.T("Stellvertreterkarte…");
             Font = new Font("Segoe UI", 10);
             AutoScaleMode = AutoScaleMode.None;
             StartPosition = FormStartPosition.CenterParent;
@@ -193,7 +196,10 @@ namespace AsnLabeler
             previous.Click += async delegate { if (!busy && page > 1) { page--; await LoadDocuments(); } };
             next.Click += async delegate { if (!busy && hasMore) { page++; await LoadDocuments(); } };
             refresh.Click += async delegate { await LoadDocuments(); };
-            print.Click += async delegate { await PrintCopy(); };
+            print.Click += async delegate {
+                if (cardMode) OpenCard(false);
+                else if (await PrintCopy(Selected,this) && MessageBox.Show(this,Loc.T("Auch eine Stellvertreterkarte für dieses Dokument drucken?"),Loc.T("Stellvertreterkarte"),MessageBoxButtons.YesNo,MessageBoxIcon.Question) == DialogResult.Yes) OpenCard(true);
+            };
             timer.Interval = config.RefreshMilliseconds;
             timer.Tick += async delegate { if (ContainsFocus && !busy && !searchDirty) await LoadDocuments(); };
             Shown += async delegate { if (!testMode) { await LoadDocuments(); timer.Start(); } };
@@ -202,6 +208,17 @@ namespace AsnLabeler
         }
 
         CopyDocument Selected { get { return grid.CurrentRow == null ? null : grid.CurrentRow.Tag as CopyDocument; } }
+
+        void OpenCard(bool labelPrinted)
+        {
+            var selected = Selected;
+            if (busy || searchDirty || selected == null) return;
+            timer.Stop();
+            try {
+                Func<IWin32Window,Task<bool>> callback = labelPrinted ? null : (Func<IWin32Window,Task<bool>>)(owner => PrintCopy(selected,owner,false));
+                using (var form = new SubstituteCardForm(config,selected,callback)) form.ShowDialog(this);
+            } finally { timer.Start(); }
+        }
 
         internal static bool ParseSearch(string text, out int asn)
         {
@@ -266,9 +283,9 @@ namespace AsnLabeler
         void UpdatePreview()
         {
             var old = preview.Image; preview.Image = null; if (old != null) old.Dispose();
-            previewTitle.Text = Loc.T("Vorschau · ") + media.WidthMm + " × " + media.PageLengthMm + " mm";
+            previewTitle.Text = cardMode ? Loc.T("Stellvertreterkarte") + " · A4" : Loc.T("Vorschau · ") + media.WidthMm + " × " + media.PageLengthMm + " mm";
             if (Selected == null) return;
-            try { preview.Image = LabelRenderer.Render(Selected.barcodeText, media, config.UsePfRightAligned, true); }
+            try { preview.Image = cardMode ? SubstituteCardRenderer.Preview(new SubstituteCardData {Title=Selected.documentTitle, Asn=Selected.barcodeText}) : LabelRenderer.Render(Selected.barcodeText, media, config.UsePfRightAligned, true); }
             catch (Exception ex) { status.Text = ex.Message; }
         }
 
@@ -306,10 +323,9 @@ namespace AsnLabeler
                 throw new InvalidOperationException(Loc.T("Dokument oder ASN wurde in Paperless geändert. Bitte neu auswählen; kein Druck gestartet."));
         }
 
-        async Task PrintCopy()
+        async Task<bool> PrintCopy(CopyDocument selected, IWin32Window owner, bool confirm = true)
         {
-            var selected = Selected;
-            if (busy || selected == null || !print.Enabled) return;
+            if (busy || searchDirty || selected == null || selected.status != "imported") return false;
             busy = true; timer.Stop(); UpdateControls();
             bool started = false;
             bool completed = false;
@@ -332,9 +348,9 @@ namespace AsnLabeler
                         }
                     });
                 UpdatePreview();
-                if (preview.Image == null) throw new InvalidOperationException(Loc.T("Das Sekundärlabel passt nicht scanbar auf die eingelegte Rolle."));
-                if (MessageBox.Show(this, selected.barcodeText + " · " + selected.documentTitle + Loc.T("\r\nEin zusätzliches Label mit ! -COPY- ! drucken?"),
-                    Loc.T("Sekundärlabel bestätigen"), MessageBoxButtons.OKCancel, MessageBoxIcon.Question) != DialogResult.OK) return;
+                using (var label = LabelRenderer.Render(selected.barcodeText,media,config.UsePfRightAligned,true)) { }
+                if (confirm && MessageBox.Show(owner, selected.barcodeText + " · " + selected.documentTitle + Loc.T("\r\nEin zusätzliches Label mit ! -COPY- ! drucken?"),
+                    Loc.T("Sekundärlabel bestätigen"), MessageBoxButtons.OKCancel, MessageBoxIcon.Question) != DialogResult.OK) return false;
                 status.Text = config.DemoMode ? Loc.T("Demo · Sekundärlabel wird gedruckt…") : Loc.T("Sekundärlabel wird gedruckt…");
                 if (config.DemoMode) await Task.Delay(3000);
                 else await Task.Run(() => BpacPrinterSession.PrintSecondary(choice, selected.barcodeText, config.UsePfRightAligned, media, () => {
@@ -367,9 +383,10 @@ namespace AsnLabeler
                 if (completed && !config.DemoMode && !receiptSaved)
                     message = Loc.T("Label erfolgreich gedruckt, Bestätigung konnte lokal nicht gespeichert werden. Nicht erneut drucken. Kopienzähler muss geprüft werden.\r\n") + ex.Message;
                 status.Text = message;
-                MessageBox.Show(this, message, Loc.T("Sekundärlabel"), MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                MessageBox.Show(owner, message, Loc.T("Sekundärlabel"), MessageBoxButtons.OK, MessageBoxIcon.Warning);
             }
             finally { busy = false; UpdateControls(); timer.Start(); }
+            return completed;
         }
 
         internal static IEnumerable<string> Validate(string snapshotPath = null)

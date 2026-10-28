@@ -80,7 +80,7 @@ $iconArg = if (Test-Path $icon) { "/win32icon:$icon" } else { $null }
   "/resource:$material,AsnLabeler.MaterialIcons.ttf" `
   "/resource:$materialLicense,AsnLabeler.MaterialIcons.LICENSE" `
   "/resource:$english,AsnLabeler.en.json" `
-  "$src" "$backends" "$matrix" "$copyLabels" "$localization" "$versionSource" "$updates" "$cli"
+  "$src" "$backends" "$matrix" "$copyLabels" "$root\src\SubstituteCardForm.cs" "$localization" "$versionSource" "$updates" "$cli"
 
 if ($LASTEXITCODE -ne 0) {
     throw "C# compiler failed with exit code $LASTEXITCODE"
@@ -113,7 +113,7 @@ if ($LASTEXITCODE -ne 0) {
   "/resource:$material,AsnLabeler.MaterialIcons.ttf" `
   "/resource:$materialLicense,AsnLabeler.MaterialIcons.LICENSE" `
   "/resource:$english,AsnLabeler.en.json" `
-  "$src" "$backends" "$matrix" "$copyLabels" "$localization" "$versionSource" "$updates" "$cli"
+  "$src" "$backends" "$matrix" "$copyLabels" "$root\src\SubstituteCardForm.cs" "$localization" "$versionSource" "$updates" "$cli"
 
 if ($LASTEXITCODE -ne 0) {
     throw "C# test compiler failed with exit code $LASTEXITCODE"
@@ -136,5 +136,5 @@ Write-Host "Built $testOut"
   "/resource:$material,AsnLabeler.MaterialIcons.ttf" `
   "/resource:$materialLicense,AsnLabeler.MaterialIcons.LICENSE" `
   "/resource:$english,AsnLabeler.en.json" `
-  "$src" "$backends" "$matrix" "$copyLabels" "$localization" "$versionSource" "$updates" "$cli"
+  "$src" "$backends" "$matrix" "$copyLabels" "$root\src\SubstituteCardForm.cs" "$localization" "$versionSource" "$updates" "$cli"
 if ($LASTEXITCODE -ne 0) { throw 'CLI compiler failed' }

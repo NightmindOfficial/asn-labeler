@@ -13,6 +13,34 @@
   document.querySelector("#settingsDialog .maintenance").before(developerSetting);
   function developerCaption() { developerLabel.textContent = T("Entwicklermodus"); }
   developerCaption();
+  const updateButton = document.createElement("button");
+  updateButton.id = "checkUpdates"; updateButton.textContent = T("Nach Updates suchen");
+  const updateResult = document.createElement("p"); updateResult.id = "updateCheckResult";
+  updateResult.setAttribute("role", "status");
+  developerSetting.before(updateButton, updateResult);
+  let checkingUpdate = false;
+  updateButton.onclick = async () => {
+    if (!key || updateButton.disabled || checkingUpdate) return;
+    checkingUpdate = true;
+    updateButton.disabled = true; updateButton.setAttribute("aria-busy", "true");
+    updateResult.textContent = T("Updates werden geprüft…");
+    const session = key;
+    try {
+      let info = await api("/api/admin/updates", {});
+      const deadline = performance.now() + 60000;
+      while (info.checking && key === session && performance.now() < deadline) {
+        await new Promise(resolve => setTimeout(resolve, 1500));
+        if (key !== session) return;
+        info = await api("/api/admin/updates");
+      }
+      if (key !== session) return;
+      showServerUpdate(info);
+      updateResult.textContent = T(info.checking ? "Prüfung läuft noch. Bitte später erneut prüfen." : info.checkFailed || info.state === "unknown" ? "Updateprüfung fehlgeschlagen. Bitte später erneut versuchen." : info.blocked ? "Sicherheitsupdate erforderlich. Neue Druckaufträge sind gesperrt." : info.updateAvailable ? "Server-Update verfügbar." : "Der Server ist aktuell.");
+      if (info.latestVersion) updateResult.textContent += " (" + info.currentVersion + " → " + info.latestVersion + ")";
+      if (info.checkedAt) updateResult.textContent += " · " + time(info.checkedAt);
+    } catch (error) { if (key === session) updateResult.textContent = error.connection ? T("Server nicht erreichbar.") : error.message; }
+    finally { checkingUpdate = false; updateButton.disabled = busy; updateButton.removeAttribute("aria-busy"); }
+  };
   try { developerSwitch.checked = localStorage.getItem("asn-admin.developerMode") === "true"; } catch (_) {}
   document.querySelector('[data-tab="logs"]').hidden = !developerSwitch.checked;
   developerSwitch.onchange = () => {
@@ -48,6 +76,7 @@
   $("language").onchange = () => {
     ASNLocale.apply($("language").value);
     developerCaption();
+    updateButton.textContent = T("Nach Updates suchen"); updateResult.textContent = "";
     notice("");
     if (key) run(async () => { lastView = ""; await load(); });
   };

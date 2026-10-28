@@ -214,6 +214,7 @@ namespace AsnLabeler
                 SettingsForm.ValidateLayout(args[1]);
                 DocumentStatusForm.RenderSnapshot(args[1]);
                 CopyLabelForm.Validate(args[1]);
+                SubstituteCardForm.Validate(args[1]);
                 UpdateForm.ValidateLayout(args[1]);
                 AppDialogs.Validate(args[1]);
                 return 0;
@@ -2422,6 +2423,20 @@ namespace AsnLabeler
             place(printer,models,20,304,276,38);
             place(maintenance,resetAsnButton,20,24,570,40);
             place(copies,copyLabelButton,20,24,570,40);
+            var card = new Button { Text = Loc.T("Stellvertreterkarte…") };
+            card.Click += delegate {
+                if (searching || resetting || !ApplySettings()) return;
+                using (var dialog = new CopyLabelForm(config,cardMode:true)) dialog.ShowDialog(this);
+            };
+            place(copies,card,20,88,570,40);
+            var blankCard = new Button { Text = Loc.T("Blanko-Stellvertreterkarte…") };
+            blankCard.Click += async delegate {
+                if (searching || resetting) return;
+                resetting = true; blankCard.Enabled = false;
+                try { await SubstituteCardForm.PrintBlank(this,demoMode.Checked); }
+                finally { resetting = false; blankCard.Enabled = true; }
+            };
+            place(copies,blankCard,20,152,570,40);
             place(about,new Label { Text = "Paperless ASN Labeler", Font = new Font(Font.FontFamily,14,FontStyle.Bold) },20,20,570,32);
             place(about,new Label { Text = "Version " + AppRelease.Version },20,58,570,24);
             place(about,new Label { Text = Loc.T("ASN-Labels und Stellvertreterlabels für paperless-ngx mit Brother QL-800."), ForeColor = Color.DimGray },20,90,570,44);
@@ -4192,6 +4207,7 @@ namespace AsnLabeler
                 if (Loc.T("Einstellungen") != "Settings" || Loc.T("ASN00001") != "ASN00001") failures.Add("Localization fallback failed.");
                 Loc.Language = "de";
                 failures.AddRange(CopyLabelForm.Validate());
+                failures.AddRange(SubstituteCardForm.Validate());
                 if (new AppConfig().RefreshMilliseconds != 30000 || new AppConfig { RefreshSeconds = 15 }.RefreshMilliseconds != 15000 ||
                     new AppConfig { RefreshSeconds = -1 }.RefreshMilliseconds != 30000)
                     failures.Add("Client refresh interval defaults or validation failed.");
