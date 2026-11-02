@@ -99,7 +99,7 @@ class ReleaseTests(unittest.TestCase):
 
     def test_status_sorted_numerically_with_titles(self):
         self.seed(10, "printed")
-        with mock.patch.object(self.app, "paperless_for_rows", return_value={2: {"title": "Invoice"}}):
+        with mock.patch.object(self.app, "paperless_for_rows", return_value={2: {"archive_serial_number": 2, "title": "Invoice"}}):
             data = self.app.document_status()
         self.assertEqual([r["asnNumber"] for r in data["items"]], [10, 3, 2])
         self.assertEqual(data["items"][-1]["documentTitle"], "Invoice")

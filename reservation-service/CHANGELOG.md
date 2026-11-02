@@ -1,5 +1,13 @@
 # Server Changelog
 
+## 2.3.0
+
+- Die Dokumentübersicht erkennt alle in Paperless vergebenen ASNs, auch ohne vorherigen normalen Labeldruck. Fehlende lokale Labeleinträge werden beim Abrufen automatisch ergänzt; bestehende Sekundärlabels werden mitgezählt.
+- Auch nachträglich importierte Dokumente unterhalb der bisherigen höchsten ASN werden erkannt. Nummernlücken ohne tatsächliches Paperless-Dokument bleiben unberührt; laufende Druckaufträge behalten Identität, Besitzer und Zustand.
+- Reservierungen unterscheiden „Gedruckt“ (bestätigter normaler Labeldruck) von „Importiert“ (nur in Paperless gefunden). Sekundärlabels verändern diese Herkunft nicht.
+- Zuvor in Paperless erkannte, später nicht mehr gefundene Dokumente werden sicherheitshalber gesperrt. Bei erneutem Auftauchen wird abhängig von der erhaltenen Druckhistorie wieder „Gedruckt“ oder „Importiert“ angezeigt. Verbindungsfehler gelten nicht als Löschung; laufende Druckaufträge und manuelle Freigaberegeln bleiben unverändert.
+- `.env`: unverändert, keine neuen Variablen oder geänderten Defaults. Kein Schemawechsel und keine manuelle Datenmigration erforderlich; Client 2.3.0 bleibt kompatibel.
+
 ## 2.2.1
 
 - Manuelle Updateprüfung in den Admin-Einstellungen mit Ladezustand und Ergebnis; parallele Prüfungen und Wiederholungen innerhalb von 60 Sekunden werden zusammengefasst.

@@ -33,6 +33,10 @@ const version = fs.readFileSync(path.join(root, '../VERSION'), 'utf8').trim();
           if (url.pathname === '/api/admin/logs') logCalls++;
           const items = url.pathname === '/api/documents/status'
             ? [0,1,2,231389271893].map((copies,i)=>({barcodeText:'ASN0000'+(4-i),status:'imported',documentTitle:'Beispieldokument '+i,reservationId:'example'+i,secondaryLabelCount:copies,updatedAt:1792800000}))
+            : url.pathname === '/api/admin/state' ? [
+                {id:'printed',asn_number:4,barcode_text:'ASN00004',status:'printed',displayStatus:'printed',updated_at:1792800000,expires_at:0},
+                {id:'imported',asn_number:3,barcode_text:'ASN00003',status:'printed',displayStatus:'external_imported',updated_at:1792800000,expires_at:0},
+                {id:'blocked',asn_number:2,barcode_text:'ASN00002',status:'blocked',displayStatus:'blocked',updated_at:1792800000,expires_at:0}]
             : url.pathname === '/api/admin/logs' ? [{time:1792800000,event:'service_started',version}] : [];
           return route.fulfill({json:{version,paperlessHighWater:1,paperlessMax:1,total:items.length,items},headers:{'X-ASN-Version':serverVersion}});
         }
@@ -92,6 +96,13 @@ const version = fs.readFileSync(path.join(root, '../VERSION'), 'utf8').trim();
         if(index>0) { assert.equal(item.background,'rgba(0, 0, 0, 0)'); assert.match(item.shadow,/inset/); }
       });
       assert.equal(await page.locator('#rows td:nth-child(3) .copy-marker').count(),0);
+      assert.equal(await page.locator('#rows .status').first().textContent(), 'In Paperless');
+      await page.locator('[data-tab="state"]').click();
+      await page.waitForFunction(() => document.querySelector('#rows .external_imported') !== null);
+      assert.deepEqual(await page.locator('#rows .status').allTextContents(), ['Gedruckt', 'Importiert', 'Gesperrt']);
+      assert.equal(await page.locator('#rows tr').nth(1).locator('button').count(), 0);
+      await page.locator('[data-tab="documents"]').click();
+      await page.waitForFunction(() => document.querySelector('#rows .imported') !== null);
       await page.locator('#settings').click(); await page.locator('#developerMode').check();
       await page.locator('#checkUpdates').click();
       await page.waitForFunction(() => document.getElementById('checkUpdates').getAttribute('aria-busy') === 'true');

@@ -115,7 +115,7 @@ class CopyLabelTests(unittest.TestCase):
         self.app.secondary_label(body, confirm=True)
         with self.app.transaction() as conn:
             conn.execute("INSERT INTO reservations VALUES (?,?,?,?,?,?,?,?)", ("two", 2, "ASN00002", "printed", 1, 1, 0, ""))
-        with mock.patch.object(self.app, "paperless_max_asn", return_value=2), mock.patch.object(self.app, "paperless_for_rows", return_value={2: {"id": 42, "title": "Doc"}}):
+        with mock.patch.object(self.app, "paperless_max_asn", return_value=2), mock.patch.object(self.app, "paperless_for_rows", return_value={2: {"id": 42, "archive_serial_number": 2, "title": "Doc"}}):
             item = self.app.document_status()["items"][0]
         self.assertEqual((item["status"], item["secondaryLabelCount"]), ("imported", 1))
 
