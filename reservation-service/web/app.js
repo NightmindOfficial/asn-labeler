@@ -115,7 +115,7 @@
   $("connectionDialog").oncancel = $("updateDialog").oncancel = event => event.preventDefault();
   $("reloadApp").onclick = () => location.reload();
   $("reloadConnection").onclick = () => location.reload();
-  const names = {reserved:"Reserviert",printing:"Druck gestartet",in_print:"In Druck",printed:"Gedruckt",reusable:"Wiederverwendbar",blocked:"Gesperrt",pending:"Scan ausstehend",uncertain:"Druck unklar",imported:"In Paperless",unused:"Nicht gedruckt"};
+  const names = {reserved:"Reserviert",printing:"Druck gestartet",in_print:"In Druck",printed:"Gedruckt",reusable:"Wiederverwendbar",blocked:"Gesperrt",pending:"Scan ausstehend",uncertain:"Druck unklar",imported:"In Paperless",external_imported:"Importiert",unused:"Nicht gedruckt"};
   const completedPreference = "asn-admin.hideCompleted";
   try {
     const saved = localStorage.getItem(completedPreference);
@@ -123,6 +123,10 @@
   } catch (_) { /* Keep the default when storage is unavailable. */ }
   const reasons = {allocated:"ASN reserviert",client_printing:"Druck gestartet",client_printed:"Druck bestätigt",client_released:"Reservierung freigegeben",label_exists:"Label vorhanden",label_destroyed_confirmed:"Label fehlt / vernichtet",safe_sync:"Sicherer Abgleich",reservation_expired:"Reservierung abgelaufen",admin_archive_open:"Durch Admin gesperrt",migration_baseline:"Datenbestand übernommen",replaced_by_new_reservation:"Erneut reserviert"};
   reasons.paperless_import_confirmed = "In Paperless erfasst; Sperre aufgehoben";
+  reasons.paperless_external_import = "Aus Paperless importiert";
+  reasons.paperless_seen_imported = "In Paperless erfasst; ohne normalen Labeldruck";
+  reasons.paperless_seen_printed = "Gedrucktes Label in Paperless erfasst";
+  reasons.paperless_document_missing = "Nicht mehr in Paperless; zur Sicherheit gesperrt";
   let key = "", tab = "documents", page = 1, busy = false;
   let eventRows = [], eventBefore = null, eventHasMore = false;
   const printedPreference = "asn-admin.hidePrinted";

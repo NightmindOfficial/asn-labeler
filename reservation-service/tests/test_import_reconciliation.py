@@ -34,18 +34,19 @@ class ImportReconciliationTests(unittest.TestCase):
     def test_admin_alone_reconciles_without_visiting_documents(self):
         result = self.app.admin_state(refresh_imports=True)
         self.assertEqual(result["items"][0]["status"], "printed")
-        self.assertEqual(result["paperlessHighWater"], 17)
+        self.assertEqual(result["paperlessHighWater"], 18)
 
     def test_higher_asn_or_mismatching_document_never_unblocks(self):
         for docs in ({}, {18: {"archive_serial_number": 18}}, {17: {"archive_serial_number": 18}}):
             self.docs = docs
-            self.assertEqual(self.app.admin_state(refresh_imports=True)["items"][0]["status"], "blocked")
+            items = self.app.admin_state(refresh_imports=True)["items"]
+            self.assertEqual(next(row for row in items if row["asn_number"] == 17)["status"], "blocked")
 
-    def test_paperless_deletion_does_not_undo_printed(self):
+    def test_paperless_deletion_blocks_previously_imported_label(self):
         self.app.document_status()
         self.docs = {}
-        self.assertEqual(self.app.document_status()["items"][0]["status"], "pending")
-        self.assertEqual(self.app.admin_state()["items"][0]["status"], "printed")
+        self.assertEqual(self.app.document_status()["items"][0]["status"], "blocked")
+        self.assertEqual(self.app.admin_state()["items"][0]["status"], "blocked")
 
     def test_offline_keeps_admin_available_and_block_intact(self):
         with mock.patch.object(self.app, "paperless_for_rows", side_effect=self.app.PaperlessError("paperless_unreachable")):

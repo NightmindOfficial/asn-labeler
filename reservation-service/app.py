@@ -427,6 +427,11 @@ def resolve_uncertain(reservation_id, exists, cancel=False, confirm_block=False,
         if any(doc.get("archive_serial_number") != number for doc in found):
             raise RuntimeError("Paperless ignored the requested ASN")
         floor = remote_floor(conn, paperless_max_asn())
+        if found:
+            seen, printed, printed_events = paperless_history(conn)
+            if number not in seen:
+                reason = "paperless_seen_printed" if primary_label_printed(row, printed, printed_events) else "paperless_seen_imported"
+                audit(conn, row, row["status"], reason)
         if found or exists:
             state = "printed"
         else:
@@ -461,23 +466,24 @@ def admin_state(page=1, refresh_imports=False, hide_printed=False):
         raise ValueError("page must be positive")
     sync_error = None
     if refresh_imports:
-        with closing(db_connect()) as source:
-            blocked = [dict(row) for row in source.execute("SELECT * FROM reservations WHERE status='blocked'")]
         try:
-            reconcile_blocked_imports(blocked, paperless_for_rows(blocked))
+            document_status()
         except PaperlessError as exc:
             # Keep local administration available when Paperless is offline.
             sync_error = exc.code
     conn = db_connect()
     try:
         rows = [dict(row) for row in conn.execute("""SELECT id, asn_number, barcode_text, status,
-                created_at, updated_at, expires_at FROM reservations WHERE (?=0 OR status!='printed')
-                ORDER BY asn_number DESC LIMIT 1000 OFFSET ?""",
-                (int(hide_printed), (page - 1) * 1000))]
+                created_at, updated_at, expires_at FROM reservations ORDER BY asn_number DESC""")]
+        seen, printed, printed_events = paperless_history(conn)
         for row in rows:
             row["displayStatus"] = ("in_print" if printing_in_progress(row) else "uncertain") if row["status"] == "printing" else row["status"]
-        return {"version": VERSION, "items": rows, "page": page, "pageSize": 1000, "paperlessSyncError": sync_error,
-                "total": conn.execute("SELECT COUNT(*) FROM reservations WHERE (?=0 OR status!='printed')", (int(hide_printed),)).fetchone()[0],
+            if row["status"] == "printed" and row["asn_number"] in seen and not primary_label_printed(row, printed, printed_events):
+                row["displayStatus"] = "external_imported"
+        if hide_printed:
+            rows = [row for row in rows if row["displayStatus"] != "printed"]
+        return {"version": VERSION, "items": rows[(page - 1) * 1000:page * 1000], "page": page, "pageSize": 1000, "paperlessSyncError": sync_error,
+                "total": len(rows),
                 "paperlessHighWater": conn.execute("SELECT value FROM metadata WHERE key='paperless_high_water'").fetchone()[0],
                 "revision": conn.execute("SELECT COALESCE(MAX(seq),0) FROM audit_events").fetchone()[0]}
     finally:
@@ -583,6 +589,66 @@ def outstanding_rows(conn):
     rows = conn.execute("SELECT * FROM reservations WHERE status IN ('reserved','printing','printed')").fetchall()
     documents = paperless_for_rows(rows)
     return [row for row in rows if row['asn_number'] not in documents]
+
+
+def paperless_history(conn):
+    # Keep provenance separate from the reservation lifecycle. Existing clients
+    # still receive the protected internal state "printed" for external imports.
+    seen, printed, printed_events = set(), set(), set()
+    for event in conn.execute("SELECT asn_number, old_status, new_status, reason FROM audit_events ORDER BY seq"):
+        number, reason = event["asn_number"], event["reason"]
+        if event["old_status"] == "printed" and number not in printed_events and number not in seen:
+            printed.add(number)  # Legacy history that starts after a real print.
+        if reason in ("client_printed", "label_exists", "paperless_seen_printed") or (
+                reason == "migration_baseline" and event["old_status"] == "printed"):
+            printed.add(number)
+        if event["new_status"] == "printed":
+            printed_events.add(number)
+        if reason in ("paperless_external_import", "paperless_import_confirmed",
+                      "paperless_seen_printed", "paperless_seen_imported"):
+            seen.add(number)
+    return seen, printed, printed_events
+
+
+def primary_label_printed(row, printed, printed_events):
+    number = row["asn_number"]
+    return number in printed or (row["status"] == "printed" and number not in printed_events)
+
+
+def reconcile_external_imports(documents, snapshots=(), revision=None):
+    # Paperless is authoritative even when no primary label was printed here.
+    # Only confirmed ASNs are materialized; gaps below the maximum are not labels.
+    with transaction() as conn:
+        # A stale negative result must not block a concurrently changed label.
+        unchanged = revision == conn.execute("SELECT COALESCE(MAX(seq),0) FROM audit_events").fetchone()[0]
+        seen, printed, printed_events = paperless_history(conn)
+        for number, doc in documents.items():
+            if doc.get("archive_serial_number") != number:
+                raise PaperlessError("paperless_response_invalid")
+            row = conn.execute("SELECT * FROM reservations WHERE asn_number=?", (number,)).fetchone()
+            if row is not None and number not in seen:
+                reason = "paperless_seen_printed" if primary_label_printed(row, printed, printed_events) else "paperless_seen_imported"
+                audit(conn, row, row["status"], reason)
+            if row is None:
+                identifier, current = str(uuid.uuid4()), now()
+                conn.execute("INSERT INTO reservations VALUES (?,?,?,?,?,?,?,?)",
+                             (identifier, number, barcode_text(number), "printed", current, current, 0, ""))
+                audit(conn, {"id": identifier, "asn_number": number, "status": ""},
+                      "printed", "paperless_external_import")
+            elif row["status"] == "reusable":
+                set_state(conn, row, "printed", "paperless_import_confirmed")
+            # Never overwrite ownership or the lifecycle of an active print.
+        if documents:
+            remote_floor(conn, max(documents))
+        if unchanged:
+            for snapshot in snapshots:
+                number = snapshot["asn_number"]
+                if snapshot["status"] != "printed" or number not in seen or number in documents:
+                    continue
+                row = conn.execute("SELECT * FROM reservations WHERE id=? AND asn_number=? AND status='printed'",
+                                   (snapshot["id"], number)).fetchone()
+                if row is not None:
+                    set_state(conn, row, "blocked", "paperless_document_missing")
 
 
 def candidate_hash(rows):
@@ -772,7 +838,13 @@ def document_status(page: int = 1, include_completed: bool = True, hide_imported
         floor = remote_floor(conn, remote_max)
         expire_reserved(conn, floor)
         rows = [dict(row) for row in conn.execute("SELECT * FROM reservations WHERE status != 'reusable' ORDER BY asn_number DESC")]
-    documents = paperless_for_rows(rows)
+        revision = conn.execute("SELECT COALESCE(MAX(seq),0) FROM audit_events").fetchone()[0]
+    # Scan the full ASN range, including documents outside local print history.
+    maximum = max([remote_max] + [row["asn_number"] for row in rows])
+    documents = paperless_for_rows([{"asn_number": 1}, {"asn_number": maximum}] if maximum else [])
+    reconcile_external_imports(documents, rows, revision)
+    with closing(db_connect()) as conn:
+        rows = [dict(row) for row in conn.execute("SELECT * FROM reservations WHERE status != 'reusable' ORDER BY asn_number DESC")]
     copies = secondary_counts(documents.values())
     reconcile_blocked_imports(rows, documents)
     counts = {"pending": 0, "in_print": 0, "uncertain": 0, "imported": 0, "unused": 0, "blocked": 0}

@@ -39,6 +39,27 @@ manuellen Befehle übernehmen nicht die Druckruhe- und Backup-Prüfungen unseres
 optionalen Host-Updaters. Das Starten per Compose aktiviert keine automatische
 Installation zukünftiger Updates.
 
+### Dokumenterkennung ab 2.3.0
+
+Beim Laden der Dokumentübersicht werden alle in Paperless vergebenen ASNs
+abgeglichen, auch ohne vorherigen Labeldruck mit diesem Dienst. Fehlende lokale
+Labeleinträge werden automatisch ergänzt und als „In Paperless“ angezeigt;
+vorhandene Sekundärlabels werden mitgezählt. Ein physischer Labeldruck ist dafür
+nicht erforderlich. Auch ältere ASNs und nachträglich gefüllte Lücken werden
+berücksichtigt. Dafür wird der ASN-Bestand in Paperless seitenweise abgefragt.
+
+Im Tab Reservierungen erscheint ein ausschließlich aus Paperless übernommener
+Eintrag als „Importiert“, ein bestätigter normaler Labeldruck weiterhin als
+„Gedruckt“. Sekundärlabels ändern diese Herkunft nicht.
+
+Nach einer Löschung des Dokuments in Paperless bleibt der lokale Labeleintrag
+erhalten und wird gesperrt. Bei erneutem Auftauchen zeigt der Dokumenttab wieder
+„In Paperless“; der Reservierungstab zeigt je nach Druckhistorie „Gedruckt“ oder
+„Importiert“. Verbindungsfehler gelten nicht als Löschung. Laufende Druckaufträge
+und die bisherigen manuellen Freigaberegeln bleiben unverändert. `.env`, Datenbankschema und bestehende
+Clientkonfiguration bleiben unverändert; eine manuelle Datenmigration ist nicht
+nötig. Client 2.3.0 kann weiterverwendet werden.
+
 ### Image und Migration ab 2.2.1
 
 Die Standarddatei enthält eine feste Imageadresse, die Docker-Oberflächen
