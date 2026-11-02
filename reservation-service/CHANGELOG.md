@@ -2,6 +2,8 @@
 
 ## 2.3.0
 
+- Gleichzeitige Erstzugriffe auf SQLite warten beim Aktivieren von WAL begrenzt auf eine belegte Datenbank, statt sporadisch mit „database is locked“ abzubrechen.
+
 - Die Dokumentübersicht erkennt alle in Paperless vergebenen ASNs, auch ohne vorherigen normalen Labeldruck. Fehlende lokale Labeleinträge werden beim Abrufen automatisch ergänzt; bestehende Sekundärlabels werden mitgezählt.
 - Auch nachträglich importierte Dokumente unterhalb der bisherigen höchsten ASN werden erkannt. Nummernlücken ohne tatsächliches Paperless-Dokument bleiben unberührt; laufende Druckaufträge behalten Identität, Besitzer und Zustand.
 - Reservierungen unterscheiden „Gedruckt“ (bestätigter normaler Labeldruck) von „Importiert“ (nur in Paperless gefunden). Sekundärlabels verändern diese Herkunft nicht.

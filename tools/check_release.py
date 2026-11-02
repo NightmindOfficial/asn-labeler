@@ -54,7 +54,9 @@ def main():
             if target == head:
                 current_tags = ["v" + version]
         validate_progression(version, previous, component_tags, current_tags)
-        if previous == version and needs_version_bump(component, changed):
+        # A failed pre-release CI run can be fixed at the same version until
+        # its component tag exists. Tagged versions remain immutable.
+        if previous == version and tag in tags and needs_version_bump(component, changed):
             raise ValueError(component + " changed without increasing its VERSION")
         publish = tag not in tags or (previous is not None and previous != version)
         outputs.extend([f"{component}_version={version}", f"{component}_release={str(publish).lower()}"])
