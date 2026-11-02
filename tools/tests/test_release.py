@@ -82,7 +82,7 @@ class VersionTests(unittest.TestCase):
 
 
 class ReleaseSelectionTests(unittest.TestCase):
-    def select(self, client, server, paths):
+    def select(self, client, server, paths, tags=("client-v1.4.3", "server-v1.4.3")):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             for folder, version in (("windows-app", client), ("reservation-service", server)):
@@ -94,7 +94,7 @@ class ReleaseSelectionTests(unittest.TestCase):
                 if args[1] == "diff":
                     return "\n".join(paths)
                 if args[1] == "tag":
-                    return "client-v1.4.3\nserver-v1.4.3\n"
+                    return "\n".join(tags)
                 if args[1] == "rev-parse":
                     return "b" * 40 if args[2] == "HEAD" else "a" * 40
                 raise AssertionError(args)
@@ -128,6 +128,23 @@ class ReleaseSelectionTests(unittest.TestCase):
         result = self.select("1.4.3", "1.4.3", ["README.md"])
         self.assertEqual(result["client_release"], "false")
         self.assertEqual(result["server_release"], "false")
+
+    def test_unreleased_server_fix_keeps_version_and_schedules_release(self):
+        result = self.select("1.4.3", "1.4.3", ["reservation-service/app.py"], tags=("client-v1.4.3",))
+        self.assertEqual(result["server_version"], "1.4.3")
+        self.assertEqual(result["server_release"], "true")
+        self.assertEqual(result["client_release"], "false")
+
+    def test_unreleased_client_fix_keeps_version_and_schedules_release(self):
+        result = self.select("1.4.3", "1.4.3", ["windows-app/src/Program.cs"], tags=("server-v1.4.3",))
+        self.assertEqual(result["client_version"], "1.4.3")
+        self.assertEqual(result["client_release"], "true")
+        self.assertEqual(result["server_release"], "false")
+
+    def test_tagged_client_stays_protected_while_server_is_unreleased(self):
+        with self.assertRaisesRegex(ValueError, "client changed without increasing"):
+            self.select("1.4.3", "1.4.3", ["windows-app/src/Program.cs", "reservation-service/app.py"],
+                        tags=("client-v1.4.3",))
 
     def test_missing_component_bump_fails(self):
         with self.assertRaises(ValueError):
