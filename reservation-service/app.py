@@ -133,12 +133,36 @@ def audit(conn, row, target, reason):
         (now(), REQUEST_ID.get(), ACTOR.get(), row["id"], row["asn_number"], row["status"], target, reason))
 
 
+def enable_wal(conn):
+    # Concurrent first connections can get SQLITE_BUSY immediately while
+    # changing journal mode, even with sqlite3.connect(timeout=10). Retry only
+    # this initialization step, with one bounded budget across all attempts.
+    deadline = time.monotonic() + 10
+    conn.execute("PRAGMA busy_timeout=0")
+    try:
+        while True:
+            try:
+                mode = conn.execute("PRAGMA journal_mode").fetchone()[0]
+                if mode != "wal":
+                    conn.execute("PRAGMA journal_mode=WAL").fetchone()
+                return
+            except sqlite3.OperationalError as exc:
+                if (getattr(exc, "sqlite_errorcode", 0) & 0xff) not in (sqlite3.SQLITE_BUSY, sqlite3.SQLITE_LOCKED):
+                    raise
+                remaining = deadline - time.monotonic()
+                if remaining <= 0:
+                    raise
+                time.sleep(min(0.05, remaining))
+    finally:
+        conn.execute("PRAGMA busy_timeout=10000")
+
+
 def db_connect():
     os.makedirs(os.path.dirname(CONFIG["sqlite_path"]) or ".", exist_ok=True)
     conn = sqlite3.connect(CONFIG["sqlite_path"], timeout=10, isolation_level=None)
     conn.row_factory = sqlite3.Row
     try:
-        conn.execute("PRAGMA journal_mode=WAL")
+        enable_wal(conn)
         conn.execute("PRAGMA synchronous=FULL")
         if conn.execute("PRAGMA user_version").fetchone()[0] > 3:
             raise RuntimeError("Database schema is newer than this service; downgrade refused")
