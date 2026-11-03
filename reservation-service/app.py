@@ -127,6 +127,8 @@ def barcode_text(number):
 
 
 def audit(conn, row, target, reason):
+    if row["status"] == target:
+        return
     conn.execute("""INSERT INTO audit_events
         (time, request_id, actor, reservation_id, asn_number, old_status, new_status, reason)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
@@ -225,6 +227,14 @@ def db_connect():
                 CHECK(printed_at IS NULL OR printed_at >= 0))""")
             conn.execute("CREATE INDEX IF NOT EXISTS idx_secondary_document ON secondary_labels(document_id, asn_number)")
             conn.execute("PRAGMA user_version=3")
+            conn.commit()
+        if not conn.execute("SELECT 1 FROM metadata WHERE key='audit_noop_cleanup_231'").fetchone():
+            conn.execute("BEGIN IMMEDIATE")
+            if not conn.execute("SELECT 1 FROM metadata WHERE key='audit_noop_cleanup_231'").fetchone():
+                # Explicitly authorized cleanup. Actual transitions retain IDs,
+                # timestamps and provenance; observations are no longer needed.
+                conn.execute("DELETE FROM audit_events WHERE old_status=new_status")
+                conn.execute("INSERT INTO metadata VALUES ('audit_noop_cleanup_231',1)")
             conn.commit()
         return conn
     except Exception:
@@ -337,7 +347,11 @@ def remote_floor(conn, remote_max):
 
 
 def set_state(conn, row, state, reason):
-    audit(conn, row, state, reason)
+    imported, printed, printed_events = paperless_history(conn)
+    external = (row["asn_number"] in imported or reason == "paperless_import_confirmed") and not primary_label_printed(row, printed, printed_events)
+    previous = "external_imported" if external and row["status"] == "printed" else row["status"]
+    target = "external_imported" if external and state == "printed" and reason not in ("client_printed", "label_exists") else state
+    audit(conn, {**dict(row), "status": previous}, target, reason)
     conn.execute("UPDATE reservations SET status=?, updated_at=?, expires_at=0 WHERE id=?",
                  (state, now(), row["id"]))
 
@@ -357,6 +371,11 @@ def expire_reserved(conn, floor):
 
 def next_number(conn, remote_max):
     floor = max(remote_max, conn.execute("SELECT value FROM metadata WHERE key='paperless_high_water'").fetchone()[0])
+    row = conn.execute("SELECT * FROM reservations WHERE asn_number=? AND status='reusable'", (remote_max + 1,)).fetchone()
+    if row is not None:
+        last = conn.execute("SELECT reason FROM audit_events WHERE reservation_id=? ORDER BY seq DESC LIMIT 1", (row["id"],)).fetchone()
+        if last and last[0] == "paperless_import_reusable" and safe_external_reuse(conn, row, remote_max):
+            return row["asn_number"]
     return allocation_number(conn, floor)
 
 
@@ -377,9 +396,10 @@ def allocation_number(conn, floor):
 def reserve_next():
     with transaction() as conn:
         check_admission(conn)
-        floor = remote_floor(conn, paperless_max_asn())
+        remote = paperless_max_asn()
+        floor = remote_floor(conn, remote)
         expire_reserved(conn, floor)
-        number = next_number(conn, floor)
+        number = next_number(conn, remote)
         old = conn.execute("SELECT * FROM reservations WHERE asn_number=?", (number,)).fetchone()
         if old:
             if old["status"] != "reusable":
@@ -396,9 +416,10 @@ def reserve_next():
 
 def peek_next():
     with transaction() as conn:
-        floor = remote_floor(conn, paperless_max_asn())
+        remote = paperless_max_asn()
+        floor = remote_floor(conn, remote)
         expire_reserved(conn, floor)
-        number = next_number(conn, floor)
+        number = next_number(conn, remote)
     return {"asnNumber": number, "barcodeText": barcode_text(number)}
 
 
@@ -451,18 +472,20 @@ def resolve_uncertain(reservation_id, exists, cancel=False, confirm_block=False,
         if any(doc.get("archive_serial_number") != number for doc in found):
             raise RuntimeError("Paperless ignored the requested ASN")
         floor = remote_floor(conn, paperless_max_asn())
-        if found:
-            seen, printed, printed_events = paperless_history(conn)
-            if number not in seen:
-                reason = "paperless_seen_printed" if primary_label_printed(row, printed, printed_events) else "paperless_seen_imported"
-                audit(conn, row, row["status"], reason)
         if found or exists:
             state = "printed"
         else:
             state = free_state(conn, number, floor)
             if state == "blocked" and number > floor and not confirm_block:
                 return {"status": "confirmation_required"}
-        set_state(conn, row, state, "label_exists" if exists else "label_destroyed_confirmed")
+        if found and not exists:
+            imported, printed, printed_events = paperless_history(conn)
+            target = "printed" if primary_label_printed(row, printed, printed_events) else "external_imported"
+            previous = "external_imported" if row["asn_number"] in imported and not primary_label_printed(row, printed, printed_events) and row["status"] == "printed" else row["status"]
+            audit(conn, {**dict(row), "status": previous}, target, "paperless_import_confirmed")
+            conn.execute("UPDATE reservations SET status='printed',updated_at=?,expires_at=0 WHERE id=?", (now(), row["id"]))
+        else:
+            set_state(conn, row, state, "label_exists" if exists else "label_destroyed_confirmed")
     return {"status": "imported" if found else "pending" if exists else "blocked" if state == "blocked" else "next"}
 
 
@@ -479,7 +502,7 @@ def reset_to_paperless():
             released += state == "reusable"
             changed += 1
         retained = conn.execute("SELECT COUNT(*) FROM reservations WHERE asn_number > ? AND status IN ('printing','printed','blocked')", (remote,)).fetchone()[0]
-        number = next_number(conn, floor)
+        number = next_number(conn, remote)
     return {"ok": True, "paperlessMax": remote, "deletedReservations": 0,
             "releasedReservations": released, "invalidatedReservations": changed, "retainedReservations": retained,
             "nextAsnNumber": number, "nextBarcodeText": barcode_text(number), "safeSync": True}
@@ -554,7 +577,8 @@ def backup_before_migration():
     if not source.is_file():
         return
     with closing(sqlite3.connect(source.resolve().as_uri() + "?mode=ro", uri=True)) as conn:
-        if conn.execute("PRAGMA user_version").fetchone()[0] >= 3:
+        if (conn.execute("PRAGMA user_version").fetchone()[0] >= 3 and
+                conn.execute("SELECT 1 FROM metadata WHERE key='audit_noop_cleanup_231'").fetchone()):
             return
         folder = source.parent / "backups"
         folder.mkdir(exist_ok=True, mode=0o700)
@@ -626,7 +650,7 @@ def paperless_history(conn):
         if reason in ("client_printed", "label_exists", "paperless_seen_printed") or (
                 reason == "migration_baseline" and event["old_status"] == "printed"):
             printed.add(number)
-        if event["new_status"] == "printed":
+        if event["new_status"] in ("printed", "external_imported"):
             printed_events.add(number)
         if reason in ("paperless_external_import", "paperless_import_confirmed",
                       "paperless_seen_printed", "paperless_seen_imported"):
@@ -639,7 +663,25 @@ def primary_label_printed(row, printed, printed_events):
     return number in printed or (row["status"] == "printed" and number not in printed_events)
 
 
-def reconcile_external_imports(documents, snapshots=(), revision=None):
+def secondary_evidence(conn, number):
+    # Unconfirmed copy jobs are protected too: lack of acknowledgement does not
+    # prove that no physical label exists. Older audit evidence remains valid.
+    return (conn.execute("SELECT 1 FROM secondary_labels WHERE asn_number=? LIMIT 1", (number,)).fetchone() is not None
+            or conn.execute("SELECT 1 FROM audit_events WHERE asn_number=? AND reason='secondary_label_confirmed' LIMIT 1", (number,)).fetchone() is not None)
+
+
+def safe_external_reuse(conn, row, remote_max, history=None):
+    imported, printed, printed_events = history if history is not None else paperless_history(conn)
+    number = row["asn_number"]
+    if (number not in imported or primary_label_printed(row, printed, printed_events)
+            or number != remote_max + 1 or secondary_evidence(conn, number)):
+        return False
+    if conn.execute("SELECT value FROM metadata WHERE key='paperless_high_water'").fetchone()[0] > number:
+        return False
+    return conn.execute("SELECT 1 FROM reservations WHERE asn_number>? AND status!='reusable' LIMIT 1", (number,)).fetchone() is None
+
+
+def reconcile_external_imports(documents, snapshots=(), revision=None, remote_max=None):
     # Paperless is authoritative even when no primary label was printed here.
     # Only confirmed ASNs are materialized; gaps below the maximum are not labels.
     with transaction() as conn:
@@ -650,15 +692,12 @@ def reconcile_external_imports(documents, snapshots=(), revision=None):
             if doc.get("archive_serial_number") != number:
                 raise PaperlessError("paperless_response_invalid")
             row = conn.execute("SELECT * FROM reservations WHERE asn_number=?", (number,)).fetchone()
-            if row is not None and number not in seen:
-                reason = "paperless_seen_printed" if primary_label_printed(row, printed, printed_events) else "paperless_seen_imported"
-                audit(conn, row, row["status"], reason)
             if row is None:
                 identifier, current = str(uuid.uuid4()), now()
                 conn.execute("INSERT INTO reservations VALUES (?,?,?,?,?,?,?,?)",
                              (identifier, number, barcode_text(number), "printed", current, current, 0, ""))
                 audit(conn, {"id": identifier, "asn_number": number, "status": ""},
-                      "printed", "paperless_external_import")
+                      "external_imported", "paperless_external_import")
             elif row["status"] == "reusable":
                 set_state(conn, row, "printed", "paperless_import_confirmed")
             # Never overwrite ownership or the lifecycle of an active print.
@@ -671,8 +710,10 @@ def reconcile_external_imports(documents, snapshots=(), revision=None):
                     continue
                 row = conn.execute("SELECT * FROM reservations WHERE id=? AND asn_number=? AND status='printed'",
                                    (snapshot["id"], number)).fetchone()
-                if row is not None:
-                    set_state(conn, row, "blocked", "paperless_document_missing")
+                if row is not None and not primary_label_printed(row, printed, printed_events) and not secondary_evidence(conn, number):
+                    reusable = remote_max is not None and safe_external_reuse(conn, row, remote_max, (seen, printed, printed_events))
+                    set_state(conn, row, "reusable" if reusable else "blocked",
+                              "paperless_import_reusable" if reusable else "paperless_document_missing")
 
 
 def candidate_hash(rows):
@@ -743,7 +784,7 @@ def unblock_reservation(rid, confirmation, physical_label_absent):
                         (row["asn_number"],)).fetchone():
             raise ValueError("Reservation hat hoehere aktive ASNs (reserviert, Druck unklar oder gedruckt).")
         set_state(conn, row, "reusable", "admin_unblocked")
-        number = next_number(conn, floor)
+        number = next_number(conn, remote)
     return {"ok": True, "status": "reusable", "nextAsnNumber": number, "nextBarcodeText": barcode_text(number)}
 
 
@@ -866,10 +907,13 @@ def document_status(page: int = 1, include_completed: bool = True, hide_imported
     # Scan the full ASN range, including documents outside local print history.
     maximum = max([remote_max] + [row["asn_number"] for row in rows])
     documents = paperless_for_rows([{"asn_number": 1}, {"asn_number": maximum}] if maximum else [])
-    reconcile_external_imports(documents, rows, revision)
+    reconcile_external_imports(documents, rows, revision, remote_max)
     with closing(db_connect()) as conn:
         rows = [dict(row) for row in conn.execute("SELECT * FROM reservations WHERE status != 'reusable' ORDER BY asn_number DESC")]
-    copies = secondary_counts(documents.values())
+    with closing(db_connect()) as conn:
+        copies = dict(conn.execute("SELECT asn_number,COUNT(*) FROM secondary_labels WHERE printed_at IS NOT NULL GROUP BY asn_number"))
+        for number, count in conn.execute("SELECT asn_number,COUNT(*) FROM audit_events WHERE reason='secondary_label_confirmed' GROUP BY asn_number"):
+            copies[number] = max(copies.get(number, 0), count)
     reconcile_blocked_imports(rows, documents)
     counts = {"pending": 0, "in_print": 0, "uncertain": 0, "imported": 0, "unused": 0, "blocked": 0}
     items = []
@@ -881,7 +925,7 @@ def document_status(page: int = 1, include_completed: bool = True, hide_imported
         counts[state] += 1
         items.append({"reservationId": row["id"], "asnNumber": row["asn_number"], "barcodeText": row["barcode_text"],
             "status": state, "updatedAt": row["updated_at"], "documentTitle": doc.get("title", "") if doc else "",
-            "secondaryLabelCount": copies.get((doc.get("id"), row["asn_number"]), 0) if doc else 0})
+            "secondaryLabelCount": copies.get(row["asn_number"], 0)})
     conn = db_connect()
     try:
         next_asn = next_number(conn, remote_max)

@@ -1,5 +1,13 @@
 # Server Changelog
 
+## 2.3.1
+
+- Bei unverändertem Reservierungsstatus entstehen keine zusätzlichen Ereignisse. Alte gleiche Statusübergänge werden einmalig bereinigt; echte Statuswechsel bleiben erhalten. Es gibt keinen Anzeigefilter und keine zusätzliche Statustabelle.
+- Verschwindet ein Dokument, bleiben normal gedruckte Labels und importierte ASNs mit Sekundärlabel als „Scan ausstehend“ erhalten. Ihr Reservierungsstatus bleibt unverändert.
+- Rein importierte ASNs ohne Drucknachweis werden gesperrt oder, ausschließlich direkt oberhalb des aktuellen Paperless-Höchststands und ohne höhere Schutzgrenzen, automatisch wiederverwendbar. Der gespeicherte Höchststand wird nicht abgesenkt.
+- Sekundärlabel-Indikatoren bleiben nach dem Verschwinden des Dokuments erhalten; der Änderungsverlauf zeigt lesbare deutsche und englische Bezeichnungen.
+- `.env` und Datenbankschema 3 bleiben unverändert. Beim regulären Serverstart wird vor der einmaligen Verlaufsbereinigung eine Sicherung erstellt. Client 2.3.0 bleibt kompatibel. Keine Änderungen am Header oder am Abfrageintervall.
+
 ## 2.3.0
 
 - Gleichzeitige Erstzugriffe auf SQLite warten beim Aktivieren von WAL begrenzt auf eine belegte Datenbank, statt sporadisch mit „database is locked“ abzubrechen.

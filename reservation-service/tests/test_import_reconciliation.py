@@ -29,7 +29,7 @@ class ImportReconciliationTests(unittest.TestCase):
         events = self.app.admin_events()["items"]
         events = [event for event in events if event["reason"] == "paperless_import_confirmed"]
         self.assertEqual(len(events), 1)
-        self.assertEqual((events[0]["old_status"], events[0]["new_status"]), ("blocked", "printed"))
+        self.assertEqual((events[0]["old_status"], events[0]["new_status"]), ("blocked", "external_imported"))
 
     def test_admin_alone_reconciles_without_visiting_documents(self):
         result = self.app.admin_state(refresh_imports=True)

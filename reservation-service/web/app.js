@@ -115,7 +115,7 @@
   $("connectionDialog").oncancel = $("updateDialog").oncancel = event => event.preventDefault();
   $("reloadApp").onclick = () => location.reload();
   $("reloadConnection").onclick = () => location.reload();
-  const names = {reserved:"Reserviert",printing:"Druck gestartet",in_print:"In Druck",printed:"Gedruckt",reusable:"Wiederverwendbar",blocked:"Gesperrt",pending:"Scan ausstehend",uncertain:"Druck unklar",imported:"In Paperless",external_imported:"Importiert",unused:"Nicht gedruckt"};
+  const names = {reserved:"Reserviert",printing:"Druck gestartet",in_print:"In Druck",printed:"Gedruckt",reusable:"Wiederverwendbar",blocked:"Gesperrt",pending:"Scan ausstehend",uncertain:"Druck unklar",imported:"In Paperless",external_imported:"Importiert",copy_prepared:"Sekundärlabel vorbereitet",copy_printed:"Sekundärlabel gedruckt",unused:"Nicht gedruckt"};
   const completedPreference = "asn-admin.hideCompleted";
   try {
     const saved = localStorage.getItem(completedPreference);
@@ -126,6 +126,8 @@
   reasons.paperless_external_import = "Aus Paperless importiert";
   reasons.paperless_seen_imported = "In Paperless erfasst; ohne normalen Labeldruck";
   reasons.paperless_seen_printed = "Gedrucktes Label in Paperless erfasst";
+  reasons.secondary_label_confirmed = "Sekundärlabel-Druck bestätigt";
+  reasons.paperless_import_reusable = "Importierte ASN nicht mehr in Paperless; sicher wiederverwendbar";
   reasons.paperless_document_missing = "Nicht mehr in Paperless; zur Sicherheit gesperrt";
   let key = "", tab = "documents", page = 1, busy = false;
   let eventRows = [], eventBefore = null, eventHasMore = false;
