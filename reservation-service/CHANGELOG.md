@@ -1,5 +1,12 @@
 # Server Changelog
 
+## 2.3.2
+
+- Manuelle Freigaben zeigen im Änderungsverlauf den verständlichen Grund „ASN manuell freigegeben“ statt `admin_unblocked`, mit englischer Übersetzung.
+- Der Änderungsverlauf nummeriert vorhandene Ereignisse lückenlos. Die in 2.3.1 gelöschten gleichen Statusübergänge hinterlassen keine sichtbaren Nummernsprünge mehr. Interne IDs für Paginierung und Sicherheitsprüfungen bleiben unverändert.
+- „Gedruckte ausblenden“ blendet jetzt sowohl „Gedruckt“ als auch „Importiert“ aus; die Beschriftung bleibt unverändert.
+- `.env` und Datenbankschema bleiben unverändert. Keine weitere Datenbereinigung oder manuelle Migration nötig; Client 2.3.0 bleibt kompatibel.
+
 ## 2.3.1
 
 - Bei unverändertem Reservierungsstatus entstehen keine zusätzlichen Ereignisse. Alte gleiche Statusübergänge werden einmalig bereinigt; echte Statuswechsel bleiben erhalten. Es gibt keinen Anzeigefilter und keine zusätzliche Statustabelle.

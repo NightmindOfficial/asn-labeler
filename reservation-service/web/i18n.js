@@ -41,6 +41,7 @@ window.ASNLocale = (() => {
     "Service wurde aktualisiert":"Service updated", "Bitte lade das Adminpanel neu, bevor du weiterarbeitest. Anschließend ist eine erneute Anmeldung erforderlich.":"Reload the admin panel before continuing. You will need to sign in again.",
     "Jetzt neu laden":"Reload now", "Wird verarbeitet…":"Processing…", "Verbindung wiederhergestellt":"Connection restored",
     "Reserviert":"Reserved", "Druck gestartet":"Print started", "In Druck":"Printing", "Gedruckt":"Printed", "Wiederverwendbar":"Reusable",
+    "ASN manuell freigegeben":"ASN manually released",
     "Sekundärlabel vorbereitet":"Secondary label prepared", "Sekundärlabel gedruckt":"Secondary label printed",
     "Sekundärlabel-Druck bestätigt":"Secondary label print confirmed",
     "Importierte ASN nicht mehr in Paperless; sicher wiederverwendbar":"Imported ASN no longer in Paperless; safely reusable",
