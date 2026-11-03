@@ -134,8 +134,8 @@ class ExternalImportTests(unittest.TestCase):
         self.assertEqual(self.local_status(), "printed")
         self.assertEqual(self.app.admin_state(hide_printed=True)["total"], 0)
         self.docs.clear()
-        self.assertEqual(self.app.document_status()["items"][0]["status"], "blocked")
-        self.assertEqual(self.local_status(), "blocked")
+        self.assertEqual(self.app.document_status()["items"][0]["status"], "pending")
+        self.assertEqual(self.local_status(), "printed")
         self.add_doc(120)
         self.assertEqual(self.app.document_status()["items"][0]["status"], "imported")
         self.assertEqual(self.local_status(), "printed")
@@ -190,7 +190,7 @@ class ExternalImportTests(unittest.TestCase):
         self.app.document_status()
         self.assertEqual(self.local_status(row["asnNumber"]), "uncertain")
         self.app.transition(row["reservationId"], "printed")
-        self.assertEqual(self.app.document_status()["items"][0]["status"], "blocked")
+        self.assertEqual(self.app.document_status()["items"][0]["status"], "pending")
         self.add_doc(row["asnNumber"])
         self.app.document_status()
         self.assertEqual(self.local_status(row["asnNumber"]), "printed")
@@ -229,3 +229,119 @@ class ExternalImportTests(unittest.TestCase):
             self.app.document_status()
         events = self.app.admin_events()["items"]
         self.assertEqual(len([e for e in events if e["reason"] == "paperless_document_missing"]), 1)
+
+
+    def test_primary_print_detection_and_disappearance_add_no_audit_events(self):
+        self.add_row(120, "printed")
+        before = self.app.admin_events()["items"]
+        self.add_doc(120)
+        self.app.document_status()
+        self.docs.clear()
+        for _ in range(3):
+            self.assertEqual(self.app.document_status()["items"][0]["status"], "pending")
+        self.assertEqual(self.local_status(), "printed")
+        self.assertEqual(self.app.admin_events()["items"], before)
+
+    def test_imported_next_asn_is_reusable_without_lowering_historical_floor(self):
+        self.add_doc(119)
+        self.add_doc(120)
+        self.app.document_status()
+        del self.docs[120]
+        result = self.app.document_status()
+        self.assertEqual([item["asnNumber"] for item in result["items"]], [119])
+        self.assertEqual(result["nextAsnNumber"], 120)
+        self.assertEqual(self.local_status(), "reusable")
+        self.assertEqual(self.app.admin_state()["paperlessHighWater"], 120)
+        events = self.app.admin_events()["items"]
+        self.assertEqual((events[-1]["old_status"], events[-1]["new_status"]), ("external_imported", "reusable"))
+        self.assertEqual(self.app.peek_next()["asnNumber"], 120)
+        self.assertEqual(self.app.reserve_next()["asnNumber"], 120)
+        self.assertEqual(self.app.reserve_next()["asnNumber"], 121)
+
+    def test_concurrent_allocation_reuses_imported_tail_only_once(self):
+        self.add_doc(119)
+        self.add_doc(120)
+        self.app.document_status()
+        del self.docs[120]
+        self.app.document_status()
+        with ThreadPoolExecutor(max_workers=4) as pool:
+            numbers = list(pool.map(lambda _: self.app.reserve_next()["asnNumber"], range(4)))
+        self.assertEqual(sorted(numbers), [120, 121, 122, 123])
+
+    def test_reuse_exception_persists_across_restart(self):
+        self.add_doc(119)
+        self.add_doc(120)
+        self.app.document_status()
+        del self.docs[120]
+        self.app.document_status()
+        restarted = load_app(os.path.join(self.temp.name, "db.sqlite3"))
+        with mock.patch.object(restarted, "paperless_max_asn", return_value=119):
+            self.assertEqual(restarted.reserve_next()["asnNumber"], 120)
+
+    def test_higher_local_block_prevents_import_reuse(self):
+        self.add_doc(119)
+        self.add_doc(120)
+        self.add_row(121, "blocked")
+        self.app.document_status()
+        del self.docs[120]
+        self.app.document_status()
+        self.assertEqual(self.local_status(), "blocked")
+        self.assertEqual(self.app.peek_next()["asnNumber"], 122)
+
+    def test_higher_historical_floor_prevents_import_reuse(self):
+        self.add_doc(119)
+        self.add_doc(120)
+        self.app.document_status()
+        with self.app.transaction() as conn:
+            self.app.remote_floor(conn, 125)
+        del self.docs[120]
+        self.app.document_status()
+        self.assertEqual(self.local_status(), "blocked")
+        self.assertEqual(self.app.peek_next()["asnNumber"], 126)
+
+    def test_secondary_label_keeps_missing_import_pending_with_counter(self):
+        self.add_doc(119)
+        self.add_doc(120)
+        self.app.document_status()
+        with self.app.transaction() as conn:
+            conn.execute("INSERT INTO secondary_labels VALUES (?,?,?,?,?,?)", ("copy", 1120, 120, "owner", 1, 2))
+        before = self.app.admin_events()["items"]
+        del self.docs[120]
+        result = self.app.document_status()
+        item = next(r for r in result["items"] if r["asnNumber"] == 120)
+        self.assertEqual((item["status"], item["secondaryLabelCount"]), ("pending", 1))
+        self.assertEqual(self.local_status(), "external_imported")
+        self.assertEqual(self.app.admin_events()["items"], before)
+        self.assertEqual(result["nextAsnNumber"], 121)
+
+    def test_secondary_history_alone_protects_missing_import(self):
+        self.add_doc(119)
+        self.add_doc(120)
+        self.app.document_status()
+        with self.app.transaction() as conn:
+            self.app.audit(conn, {"id": "copy", "asn_number": 120, "status": "copy_prepared"}, "copy_printed", "secondary_label_confirmed")
+        del self.docs[120]
+        item = self.app.document_status()["items"][0]
+        self.assertEqual((item["status"], item["secondaryLabelCount"]), ("pending", 1))
+        self.assertEqual(self.local_status(), "external_imported")
+
+    def test_unconfirmed_secondary_job_prevents_automatic_reuse(self):
+        self.add_doc(119)
+        self.add_doc(120)
+        self.app.document_status()
+        with self.app.transaction() as conn:
+            conn.execute("INSERT INTO secondary_labels VALUES (?,?,?,?,?,?)", ("uncertain", 1120, 120, "owner", 1, None))
+        del self.docs[120]
+        self.assertEqual(self.app.document_status()["items"][0]["status"], "pending")
+        self.assertEqual(self.app.peek_next()["asnNumber"], 121)
+
+    def test_reappearing_import_revokes_reuse_exception(self):
+        self.add_doc(119)
+        self.add_doc(120)
+        self.app.document_status()
+        del self.docs[120]
+        self.app.document_status()
+        self.add_doc(120)
+        self.assertEqual(self.app.document_status()["items"][0]["status"], "imported")
+        self.assertEqual(self.local_status(), "external_imported")
+        self.assertEqual(self.app.peek_next()["asnNumber"], 121)

@@ -37,6 +37,7 @@ const version = fs.readFileSync(path.join(root, '../VERSION'), 'utf8').trim();
                 {id:'printed',asn_number:4,barcode_text:'ASN00004',status:'printed',displayStatus:'printed',updated_at:1792800000,expires_at:0},
                 {id:'imported',asn_number:3,barcode_text:'ASN00003',status:'printed',displayStatus:'external_imported',updated_at:1792800000,expires_at:0},
                 {id:'blocked',asn_number:2,barcode_text:'ASN00002',status:'blocked',displayStatus:'blocked',updated_at:1792800000,expires_at:0}]
+            : url.pathname === '/api/admin/events' ? [{seq:470,asn_number:120,time:1793637984,old_status:'copy_prepared',new_status:'copy_printed',reason:'secondary_label_confirmed',actor:'test-client'}]
             : url.pathname === '/api/admin/logs' ? [{time:1792800000,event:'service_started',version}] : [];
           return route.fulfill({json:{version,paperlessHighWater:1,paperlessMax:1,total:items.length,items},headers:{'X-ASN-Version':serverVersion}});
         }
@@ -101,6 +102,13 @@ const version = fs.readFileSync(path.join(root, '../VERSION'), 'utf8').trim();
       await page.waitForFunction(() => document.querySelector('#rows .external_imported') !== null);
       assert.deepEqual(await page.locator('#rows .status').allTextContents(), ['Gedruckt', 'Importiert', 'Gesperrt']);
       assert.equal(await page.locator('#rows tr').nth(1).locator('button').count(), 0);
+      await page.locator('[data-tab="events"]').click();
+      await page.waitForFunction(() => document.querySelector('#rows').textContent.includes('Sekundärlabel-Druck bestätigt'));
+      assert((await page.locator('#rows').textContent()).includes('Sekundärlabel vorbereitet → Sekundärlabel gedruckt'));
+      assert(!(await page.locator('#rows').textContent()).includes('copy_prepared'));
+      await page.locator('#language').selectOption('en');
+      await page.waitForFunction(() => document.querySelector('#rows').textContent.includes('Secondary label print confirmed'));
+      await page.locator('#language').selectOption('de');
       await page.locator('[data-tab="documents"]').click();
       await page.waitForFunction(() => document.querySelector('#rows .imported') !== null);
       await page.locator('#settings').click(); await page.locator('#developerMode').check();

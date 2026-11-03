@@ -270,11 +270,11 @@ class MigrationTests(unittest.TestCase):
                 self.assertGreater(rows["b"]["expires_at"], app.now())
                 self.assertEqual(rows["c"]["status"], "printing")
                 self.assertEqual(rows["d"]["status"], "blocked")
-                self.assertEqual(conn.execute("SELECT COUNT(*) FROM audit_events").fetchone()[0], 4)
+                self.assertEqual(conn.execute("SELECT COUNT(*) FROM audit_events").fetchone()[0], 2)
             finally:
                 conn.close()
             app.db_connect().close()
-            self.assertEqual(len(app.admin_events()["items"]), 4)
+            self.assertEqual(len(app.admin_events()["items"]), 2)
 
     def test_duplicate_migration_stops_without_modifying_database(self):
         with tempfile.TemporaryDirectory() as folder:

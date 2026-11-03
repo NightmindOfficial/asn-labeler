@@ -52,13 +52,19 @@ Im Tab Reservierungen erscheint ein ausschließlich aus Paperless übernommener
 Eintrag als „Importiert“, ein bestätigter normaler Labeldruck weiterhin als
 „Gedruckt“. Sekundärlabels ändern diese Herkunft nicht.
 
-Nach einer Löschung des Dokuments in Paperless bleibt der lokale Labeleintrag
-erhalten und wird gesperrt. Bei erneutem Auftauchen zeigt der Dokumenttab wieder
-„In Paperless“; der Reservierungstab zeigt je nach Druckhistorie „Gedruckt“ oder
-„Importiert“. Verbindungsfehler gelten nicht als Löschung. Laufende Druckaufträge
-und die bisherigen manuellen Freigaberegeln bleiben unverändert. `.env`, Datenbankschema und bestehende
-Clientkonfiguration bleiben unverändert; eine manuelle Datenmigration ist nicht
-nötig. Client 2.3.0 kann weiterverwendet werden.
+Ab Server 2.3.1 bleiben nach dem Verschwinden eines Dokuments normal gedruckte
+Labels sowie importierte ASNs mit Sekundärlabels als „Scan ausstehend“ erhalten.
+Der Reservierungsstatus ändert sich dabei nicht. Rein importierte ASNs ohne
+Labeldruck werden gesperrt. Nur die unmittelbar nächste ASN oberhalb des aktuellen
+Paperless-Höchststands kann automatisch wiederverwendbar werden, wenn weder
+Sekundärdrucke noch höhere lokale oder historische Schutzgrenzen entgegenstehen.
+Verbindungsfehler gelten nicht als Löschung.
+
+Es werden keine zusätzlichen Paperless-Beobachtungen gespeichert: Druck- und
+Importherkunft ergeben sich aus den tatsächlichen Statuswechseln. Alte gleiche
+Statusübergänge werden einmalig bereinigt; beim regulären Start wird zuvor ein
+Backup angelegt. `.env`, Datenbankschema 3 und die Clientkonfiguration bleiben
+unverändert; Client 2.3.0 bleibt kompatibel.
 
 ### Image und Migration ab 2.2.1
 
