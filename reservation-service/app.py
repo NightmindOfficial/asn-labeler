@@ -528,7 +528,7 @@ def admin_state(page=1, refresh_imports=False, hide_printed=False):
             if row["status"] == "printed" and row["asn_number"] in seen and not primary_label_printed(row, printed, printed_events):
                 row["displayStatus"] = "external_imported"
         if hide_printed:
-            rows = [row for row in rows if row["displayStatus"] != "printed"]
+            rows = [row for row in rows if row["displayStatus"] not in ("printed", "external_imported")]
         return {"version": VERSION, "items": rows[(page - 1) * 1000:page * 1000], "page": page, "pageSize": 1000, "paperlessSyncError": sync_error,
                 "total": len(rows),
                 "paperlessHighWater": conn.execute("SELECT value FROM metadata WHERE key='paperless_high_water'").fetchone()[0],
@@ -549,9 +549,17 @@ def recent_admin_events(before=None):
     if before is not None and not 1 <= before <= 9223372036854775807:
         raise ValueError("before must be positive")
     with closing(db_connect()) as conn:
+        # Rows and their positions must come from the same read snapshot.
+        # Keep seq immutable for cursors and safety revisions; only the visible
+        # event number counts the actual surviving history without gaps.
+        conn.execute("BEGIN")
         where, parameters = ("", ()) if before is None else ("WHERE seq < ?", (before,))
         rows = [dict(row) for row in conn.execute(
             f"SELECT * FROM audit_events {where} ORDER BY seq DESC LIMIT 21", parameters)]
+        if rows:
+            number = conn.execute("SELECT COUNT(*) FROM audit_events WHERE seq <= ?", (rows[0]["seq"],)).fetchone()[0]
+            for offset, row in enumerate(rows):
+                row["displayNumber"] = number - offset
     items = rows[:20]
     return {"items": items, "hasMore": len(rows) > 20,
             "nextBefore": items[-1]["seq"] if len(rows) > 20 else None}

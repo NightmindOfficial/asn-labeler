@@ -37,9 +37,11 @@ const version = fs.readFileSync(path.join(root, '../VERSION'), 'utf8').trim();
                 {id:'printed',asn_number:4,barcode_text:'ASN00004',status:'printed',displayStatus:'printed',updated_at:1792800000,expires_at:0},
                 {id:'imported',asn_number:3,barcode_text:'ASN00003',status:'printed',displayStatus:'external_imported',updated_at:1792800000,expires_at:0},
                 {id:'blocked',asn_number:2,barcode_text:'ASN00002',status:'blocked',displayStatus:'blocked',updated_at:1792800000,expires_at:0}]
-            : url.pathname === '/api/admin/events' ? [{seq:470,asn_number:120,time:1793637984,old_status:'copy_prepared',new_status:'copy_printed',reason:'secondary_label_confirmed',actor:'test-client'}]
+            : url.pathname === '/api/admin/events' ? [{seq:595,displayNumber:478,asn_number:120,time:1793637984,old_status:'blocked',new_status:'reusable',reason:'admin_unblocked',actor:'test-client'}, {seq:477,displayNumber:477,asn_number:120,time:1793637984,old_status:'copy_prepared',new_status:'copy_printed',reason:'secondary_label_confirmed',actor:'test-client'}]
             : url.pathname === '/api/admin/logs' ? [{time:1792800000,event:'service_started',version}] : [];
-          return route.fulfill({json:{version,paperlessHighWater:1,paperlessMax:1,total:items.length,items},headers:{'X-ASN-Version':serverVersion}});
+          const visibleItems = url.pathname === '/api/admin/state' && url.searchParams.get('hide_printed') === 'true'
+            ? items.filter(item => !['printed','external_imported'].includes(item.displayStatus)) : items;
+          return route.fulfill({json:{version,paperlessHighWater:1,paperlessMax:1,total:visibleItems.length,items:visibleItems},headers:{'X-ASN-Version':serverVersion}});
         }
         if (['/admin/license','/admin/notices','/admin/changelog'].includes(url.pathname)) {
           if (documentFailure) return route.fulfill({status:502,contentType:'text/html',body:'<html>Gateway error</html>'});
@@ -99,15 +101,26 @@ const version = fs.readFileSync(path.join(root, '../VERSION'), 'utf8').trim();
       assert.equal(await page.locator('#rows td:nth-child(3) .copy-marker').count(),0);
       assert.equal(await page.locator('#rows .status').first().textContent(), 'In Paperless');
       await page.locator('[data-tab="state"]').click();
+      await page.waitForFunction(() => document.querySelector('#rows .blocked') !== null);
+      assert.deepEqual(await page.locator('#rows .status').allTextContents(), ['Gesperrt']);
+      assert((await page.locator('#printedControl').textContent()).includes('Gedruckte ausblenden'));
+      await page.locator('#hidePrinted').uncheck();
       await page.waitForFunction(() => document.querySelector('#rows .external_imported') !== null);
       assert.deepEqual(await page.locator('#rows .status').allTextContents(), ['Gedruckt', 'Importiert', 'Gesperrt']);
       assert.equal(await page.locator('#rows tr').nth(1).locator('button').count(), 0);
+      await page.locator('#hidePrinted').check();
+      await page.waitForFunction(() => document.querySelectorAll('#rows tr').length === 1);
+      assert.deepEqual(await page.locator('#rows .status').allTextContents(), ['Gesperrt']);
       await page.locator('[data-tab="events"]').click();
       await page.waitForFunction(() => document.querySelector('#rows').textContent.includes('Sekundärlabel-Druck bestätigt'));
       assert((await page.locator('#rows').textContent()).includes('Sekundärlabel vorbereitet → Sekundärlabel gedruckt'));
       assert(!(await page.locator('#rows').textContent()).includes('copy_prepared'));
+      assert((await page.locator('#rows').textContent()).includes('ASN manuell freigegeben'));
+      assert(!(await page.locator('#rows').textContent()).includes('admin_unblocked'));
+      assert.deepEqual(await page.locator('#rows tr td:first-child').allTextContents(), ['478 / 120', '477 / 120']);
       await page.locator('#language').selectOption('en');
       await page.waitForFunction(() => document.querySelector('#rows').textContent.includes('Secondary label print confirmed'));
+      assert((await page.locator('#rows').textContent()).includes('ASN manually released'));
       await page.locator('#language').selectOption('de');
       await page.locator('[data-tab="documents"]').click();
       await page.waitForFunction(() => document.querySelector('#rows .imported') !== null);

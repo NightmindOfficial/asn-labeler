@@ -115,7 +115,7 @@ class ExternalImportTests(unittest.TestCase):
     def test_external_import_disappearance_and_return_keep_origin_across_restart(self):
         self.add_doc(120)
         self.assertEqual(self.app.admin_state(refresh_imports=True)["items"][0]["displayStatus"], "external_imported")
-        self.assertEqual(self.app.admin_state(hide_printed=True)["total"], 1)
+        self.assertEqual(self.app.admin_state(hide_printed=True)["total"], 0)
         self.docs.clear()
         self.assertEqual(self.app.admin_state(refresh_imports=True)["items"][0]["displayStatus"], "blocked")
         self.assertEqual(self.app.document_status()["items"][0]["status"], "blocked")

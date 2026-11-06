@@ -126,6 +126,7 @@
   reasons.paperless_external_import = "Aus Paperless importiert";
   reasons.paperless_seen_imported = "In Paperless erfasst; ohne normalen Labeldruck";
   reasons.paperless_seen_printed = "Gedrucktes Label in Paperless erfasst";
+  reasons.admin_unblocked = "ASN manuell freigegeben";
   reasons.secondary_label_confirmed = "Sekundärlabel-Druck bestätigt";
   reasons.paperless_import_reusable = "Importierte ASN nicht mehr in Paperless; sicher wiederverwendbar";
   reasons.paperless_document_missing = "Nicht mehr in Paperless; zur Sicherheit gesperrt";
@@ -283,7 +284,7 @@
       hasNext = page * data.pageSize < data.total;
     } else if (tab === "events") {
       headers([T("Nr. / ASN"),T("Zeit"),T("Übergang"),T("Grund"),"Admin / Client"]);
-      data.items.forEach(item=>row([item.seq+" / "+item.asn_number,time(item.time),T(names[item.old_status] || item.old_status || "Neu")+" → "+T(names[item.new_status] || item.new_status),item.reason === "admin_high_water_corrected" ? T("Höchststand korrigiert") : T(reasons[item.reason] || item.reason),item.actor]));
+      data.items.forEach(item=>row([(item.displayNumber ?? item.seq)+" / "+item.asn_number,time(item.time),T(names[item.old_status] || item.old_status || "Neu")+" → "+T(names[item.new_status] || item.new_status),item.reason === "admin_high_water_corrected" ? T("Höchststand korrigiert") : T(reasons[item.reason] || item.reason),item.actor]));
       hasNext = eventHasMore;
     } else {
       headers([T("Zeit"),T("Ereignis"),"Details",T("Aktion")]);
